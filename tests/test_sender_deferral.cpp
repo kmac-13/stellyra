@@ -272,10 +272,14 @@ TYPED_TEST( SenderDeferralThreadSafe, AutoLoopDefersFromOtherThread )
 
 	// emit from a separate thread - should be deferred to the loop
 	std::thread t( [ & ]() { event( 99 ); } );
-	t.join();
+	t.join();  // NOTE: this joins the trigger thread, not the drain thread
 
-	// handler has not run yet on this thread, give the loop time to drain
-	// msleep( 50 );
+	// wait for the drain thread to process the deferred call, bounded so a genuine regression
+	// still fails fast rather than hanging (another option would be a condition variable)
+	for ( int i = 0; i < 100 && callCount.load() == 0; ++i )
+	{
+		msleep( 5 );
+	}
 
 	EXPECT_EQ( callCount.load(), 1 );
 }
