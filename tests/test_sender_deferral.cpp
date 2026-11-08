@@ -276,11 +276,12 @@ TYPED_TEST( SenderDeferralThreadSafe, AutoLoopDefersFromOtherThread )
 
 	// wait for the drain thread to process the deferred call, bounded so a genuine regression
 	// still fails fast rather than hanging (another option would be a condition variable)
-	for ( int i = 0; i < 100 && callCount.load() == 0; ++i )
+	auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 500 );
+	while ( callCount.load() != 1 )
 	{
-		msleep( 5 );
+		ASSERT_LT( std::chrono::steady_clock::now(), deadline ) << "timed out waiting for deferred dispatch";
+		msleep( 1 );
 	}
-
 	EXPECT_EQ( callCount.load(), 1 );
 }
 
@@ -328,8 +329,14 @@ TYPED_TEST( SenderDeferralThreadSafe, OwnedLoopSerialisation )
 	t1.join();
 	t2.join();
 
-	// msleep( 50 );
-
+	// wait for the drain thread to process the deferred call, bounded so a genuine regression
+	// still fails fast rather than hanging (another option would be a condition variable)
+	auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 500 );
+	while ( callCount.load() != 2 )
+	{
+		ASSERT_LT( std::chrono::steady_clock::now(), deadline ) << "timed out waiting for deferred dispatch";
+		msleep( 1 );
+	}
 	EXPECT_EQ( callCount.load(), 2 );
 }
 
@@ -371,6 +378,8 @@ TYPED_TEST( SenderDeferralThreadSafe, NestedEmissionOnDrainThreadStaysDirect )
 	std::thread worker( [ & ]() { event( 1 ); } );
 	worker.join();
 
+	// wait for the drain thread to process the deferred call, bounded so a genuine regression
+	// still fails fast rather than hanging (another option would be a condition variable)
 	auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds( 500 );
 	while ( ! nestedFired.load() )
 	{
