@@ -8,13 +8,13 @@
  *
  * A Trackable serves two roles:
  *
- *   Sender role (owner) - a BasicEvent constructed with this Trackable as
+ * - Sender role (owner) - a BasicEvent constructed with this Trackable as
  *   its owner derives its sender EventLoop from it.  When setEventLoop()
  *   is called, both roles are notified: owned sender events are re-resolved
  *   via updateSenderLoop() and tracked receiver connections are re-resolved
  *   via updateHandlerLoop().
  *
- *   Receiver role - connections to handlers on this object are tracked so
+ * - Receiver role - connections to handlers on this object are tracked so
  *   they are automatically disconnected when this object is destroyed.
  *   Every connection where this Trackable is the receiver shares this
  *   object's single migration tag (_migrationTag), so all of a receiver's
@@ -160,9 +160,13 @@ public:
 	 * Iterates all tracked connections and disconnects each one.  The
 	 * tracked connection list is cleared afterward.  Safe to call
 	 * explicitly (e.g. at the top of a derived class destructor before
-	 * members are freed) as well as from ~Trackable().
+	 * members are freed) as well as from ~Trackable().  Calling it
+	 * explicitly is more than a style option - see KNOWN_ISSUES.md's entry
+	 * on receiver-destruction-vs-concurrent-dispatch: without it, a
+	 * concurrently-running dispatch can observe this object mid-destruction.
 	 *
-	 * Thread-safe.
+	 * Thread-safe to call from any thread, including concurrently with an
+	 * in-flight dispatch or another disconnectAll() call.
 	 */
 	void disconnectAll();
 
@@ -427,15 +431,24 @@ inline std::vector< GenData > Trackable::extractConnectionsTo( EventImplBase* ta
  * declaration order does) means it is destroyed first, since C++ destroys
  * members in reverse declaration order - so disconnectAll() runs before any
  * of the owner's other members are torn down.  This is not a hard
- * requirement (ordinary Trackable-derived receivers get the *opposite*
+ * requirement - ordinary Trackable-derived receivers get the *opposite*
  * ordering unconditionally, since base class subobjects always destruct
- * after all derived members, and that is accepted as fine), but it is a
- * zero-cost measure that narrows the window during which a connection could
- * still be nominally live while another one of the owner's members is
- * already gone.  It does not, and cannot, protect against a dispatch that is
- * already mid-execution when the owner's destruction begins - avoiding that
- * is an ordinary lifetime/ownership responsibility of the caller, the same
- * as for any C++ object shared across threads.
+ * after all derived members (see KNOWN_ISSUES.md for the
+ * concurrent-dispatch use-after-free this can expose, and disconnectAll()'s
+ * own doc comment above for the required mitigation) - but it is a zero-cost
+ * measure that narrows the window during which a connection could still be
+ * nominally live while another one of the owner's members is already gone.
+ *
+ * Because disconnectAll() and invokeDeferred()/dispatch share the same
+ * per-event mutex, a dispatch that is already mid-execution when Anchor's
+ * destructor runs is not at risk - the destroying thread blocks on that same
+ * mutex until the in-flight call completes, before any of the owner's other
+ * members are touched.  The real gap is narrower: whatever the owner's own
+ * destructor body does before reaching Anchor (assuming its last-declared
+ * member) still races unprotected against a concurrently in-flight call -
+ * avoiding that is an ordinary lifetime/ownership responsibility of the
+ * caller for that body's own work, the same as for any C++ object shared
+ * across threads.
  */
 using Anchor = Trackable;
 
