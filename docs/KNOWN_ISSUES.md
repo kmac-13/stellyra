@@ -42,7 +42,7 @@ These are findings about the benchmark suite's toolchain and runtime environment
 
 ### 3. `thread_local` destructors are unreliable under MinGW's POSIX threading model
 
-**TL;DR:** A benchmark hung when multiple thread-creating test families ran in the same process, due to MinGW's unreliable `thread_local` destructors; fixed by running each family as its own process, after tracing the cause to MinGW’s unreliable handling of thread_local destructors (affecting any type with a non-trivial one, not something specific to vdk).
+**TL;DR:** A benchmark hung when multiple thread-creating test families ran in the same process, due to MinGW's unreliable `thread_local` destructors; fixed by running each family as its own process, after tracing the cause to MinGW's unreliable handling of thread_local destructors (affecting any type with a non-trivial one, not something specific to vdk).
 
 **Symptom:** vdk's thread-safe benchmark (`bench_vdk_ts.exe`) hung reliably when multiple *different* thread-creating benchmark families ran sequentially in one process, but never hung when any single family ran alone (even under 10 repetitions of its own thread creation/teardown cycle).  (A similar issue was encountered during work on the Nova logging library's benchmarks and/or unit tests.)
 
@@ -96,19 +96,18 @@ These are findings about the benchmark suite's toolchain and runtime environment
 
 ## Verified correctness properties
 
-### 7. Receiver destroyed before its `AutoDrainThread`/`EventLoop` - safe by design
+### 7. A disconnected or dead handler is never invoked - verified; ensuring the handler is “disconnected” in time is the receiver's responsibility
 
-**TL;DR:** Destroying a receiver before its `EventLoop`/`AutoDrainThread` is safe by design, not by luck - verified clean under AddressSanitizer and ThreadSanitizer across millions of emissions.
+**TL;DR**: The slot-liveness check and the disconnect/dispatch serialization are real, verified guarantees - but only once a connection is actually disconnected.  Whether that happens in time when a `Trackable`-derived receiver is destroyed concurrently with dispatch is a separate question - see “Known limitations” below.
 
-A receiver whose declaration order places it *after* its `EventLoop` and `AutoDrainThread` (so it is destroyed *before* either, during normal stack unwind) is safe, by design, not by accident:
+- `BasicEventImpl::invokeDeferred()` checks the slot's liveness/generation before touching anything else, and is a silent no-op if the slot is no longer live
+- `disconnectHandler()` and `invokeDeferred()` serialize against each other via the event's own mutex - once disconnected, no later dispatch can observe a slot as live, and a dispatch already in flight blocks any disconnect attempt until it completes
 
-- `BasicEventImpl::invokeDeferred()` (and `BasicConcurrentEventImpl`'s equivalent) checks the slot's liveness/generation before touching anything else, and is a silent no-op if the slot is no longer live
-- `Trackable::~Trackable()` calls `disconnectAll()`, which disconnects every tracked connection
-- Disconnection and any in-flight deferred invocation of the same slot are serialized against each other (via the event's own mutex, for `BasicEvent`; via the epoch guard, for `BasicConcurrentEvent`) - regardless of destruction order
+What this does NOT guarantee on its own: that disconnection happens before a concurrent dispatch call that's about to start.  `~Trackable()` only disconnects after the derived object's own destructor body and members have already been destroyed - see the new “Known limitations” entry below for the gap this leaves and the required mitigation.
 
-**Verification:** a properly-synchronized, parametrized test (across `Event` and `SharedEvent`) deliberately keeps this "backwards" declaration order, joins all emitter threads before destruction begins, and destroys everything immediately afterward with no wait for queues to drain - clean under both AddressSanitizer and ThreadSanitizer across millions of emissions, for both mutex types.
+**Verification**: the parametrized stress test described below is clean under AddressSanitizer and ThreadSanitizer - but only because Receiver has an explicit destructor calling disconnectAll() as its first statement.  Without that, the same test reproduced a genuine use-after-free under UBSan.
 
-**Confidence:** high.  This ordering is deliberately exercised by `BM_ConcurrentEmission_PerReceiver` and `BM_ReceiverDeferral_Serialised` as a standing demonstration of this guarantee, not something being "worked around."
+**Confidence**: high - both the mechanism and the gap it doesn't cover were directly confirmed by the same test, in each direction.
 
 ---
 
@@ -116,6 +115,10 @@ A receiver whose declaration order places it *after* its `EventLoop` and `AutoDr
 
 These are current, intentional constraints of the design - not bugs - worth knowing before relying on a workaround for one of them.
 
+- **A `Trackable`-derived receiver destroyed while a concurrent dispatch could still target it has a real use-after-free window - confirmed under UBSan.**
+  `~Trackable()`'s automatic `disconnectAll()` only runs after the derived object's own destructor body and data members have already been destroyed (base subobjects always destruct last).  If another thread is concurrently calling into that receiver's handler at the moment destruction begins - via `SharedEvent`'s intentionally-concurrent cross-thread dispatch, or a `Deferred` task whose `AutoDrainThread`/`EventLoop` hasn't been stopped or drained - the call can land on a receiver that's partway through being destroyed.  Confirmed directly: `tests/test_deferred_teardown_order.cpp`'s `SurvivesReceiverDestroyedBeforeDrainer` reproduced this as a genuine use-after-free under UBSan before being fixed.
+  **Mitigation**: give the receiver an explicit destructor whose first statement is `disconnectAll()`.  This works because that call and any in-flight `invokeDeferred()`/dispatch share the same per-event mutex - calling it first blocks the destroying thread until any call already in flight completes, and prevents a new one from starting, before any of the receiver's own teardown proceeds.  It does not protect a destructor that does other work before that call, and there is no compiler enforcement that every `Trackable`-derived class remembers to add it.
+  **Not an issue for**: the sender/dispatcher side - deferred-dispatch takes a shared_ptr to ensure liveness of the posted task regardless of whether the sender/dispatcher is still alive.  This limitation is specifically about the receiver.
 - **`SharedEvent` does not support reentrant trigger/connect/disconnect.**
   `Event`'s default recursive mutex allows a handler to legitimately connect, disconnect, or re-trigger the same event from within its own invocation; `SharedEvent`'s shared mutex does not support this, and doing it anyway can deadlock.
 - **Single-shot connections (`ConnParams::once()`) are unavailable on `SharedEvent`.**
