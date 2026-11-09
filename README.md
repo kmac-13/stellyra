@@ -68,6 +68,8 @@ handler.reset();         // connection auto-disconnects
 button.click( 30, 40 );  // safe - no crash, no call
 ```
 
+For a receiver that could be destroyed while dispatch is concurrently in flight, see `EagerDisconnector`.
+
 ### Option 2: Embed Trackable as member (non-invasive)
 
 Classes that cannot or should not modify their inheritance hierarchy can embed `stellyra::Trackable` (aliased as `stellyra::Anchor`) as a member instead.

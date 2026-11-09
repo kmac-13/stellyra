@@ -290,12 +290,23 @@ conn = event.connect( receiver1, handler1 );
 conn = event.connect( receiver2, handler2 );  // RACE CONDITION
 ```
 
+❌ **❌ Destroying a receiver while a dispatch is already in flight for it**
+```cpp
+// thread A - already inside the handler call
+event.trigger( 1 );
+
+// thread B (concurrent - UNSAFE unless receiver uses EagerDisconnector
+// or calls disconnectAll() as the first line of its own destructor)
+delete receiver;  // can observe the receiver mid-destruction
+```
+
 ### Thread Safety Rules
 
 1. **Connection operations** (`disconnect()`, `isConnected()`, `block()`, `unblock()`) are individually thread-safe, even called concurrently on the same `Connection`
 2. **Assigning a new value into the same `Connection` variable** from multiple threads is *not* thread-safe - that's a genuine data race on the handle's own storage, not on anything it points to
 3. **Event operations** are fully thread-safe
-4. **When in doubt**, use `event.disconnect(receiver)` instead of Connection handles
+4. **Destroying a Trackable-derived receiver** is not automatically safe against a dispatch already in flight for it - `~Trackable()` only disconnects after the derived object’s own destructor body and members are already gone; use `EagerDisconnector` (`trackable.h`) or call `disconnectAll()` explicitly as the first line of your own destructor to close this (see `KNOWN_ISSUES.md`)
+5. **When in doubt**, use `event.disconnect(receiver)` instead of Connection handles
 
 ---
 
@@ -319,7 +330,7 @@ event.connect( receiver, handler, stellyra::ConnectionType::Direct );
 event.connect( receiver, handler, stellyra::ConnectionType::Deferred );
 ```
 
-`Auto` is the right default in nearly all cases - it gives you `Direct`’s zero-overhead dispatch whenever it’s actually safe (same loop) and falls back to `Deferred` automatically otherwise, without you having to track loop topology by hand or re-check it after a `setEventLoop()` call.  Use explicit `Direct` / `Deferred` only when you need to force one regardless of topology.
+`Auto` is the right default in nearly all cases - it gives you `Direct`'s zero-overhead dispatch whenever it's actually safe (same loop) and falls back to `Deferred` automatically otherwise, without you having to track loop topology by hand or re-check it after a `setEventLoop()` call.  Use explicit `Direct` / `Deferred` only when you need to force one regardless of topology.
 
 ### Tip 2: Don't Store Connections You Don't Need
 
@@ -349,7 +360,7 @@ for ( auto& conn : connections ) {
 group.disconnectAll();
 ```
 
-`ConnectionGroup::disconnectAll()` does the same per-connection loop internally - it isn’t a batched or single-lock operation like `EventStorage::disconnectAll()` (the whole-event version) is.  The win is encapsulation, not throughput.
+`ConnectionGroup::disconnectAll()` does the same per-connection loop internally - it isn't a batched or single-lock operation like `EventStorage::disconnectAll()` (the whole-event version) is.  The win is encapsulation, not throughput.
 
 ### Tip 4: Avoid Rapid Connect/Disconnect Cycles
 
@@ -717,5 +728,6 @@ int main() {
 | event.disconnect(receiver) | Multi-threaded | ✅ |
 | Connection stored locally | Single thread | ✅ |
 | Connection in shared container | Never (use ConnectionGuard) | ❌ |
+| Destroying a receiver during concurrent dispatch | Use EagerDisconnector or explicit disconnectAll() | ⚠️ Only if mitigated |
 
 **When in doubt: Don't store Connection handles, let auto-disconnect work!**

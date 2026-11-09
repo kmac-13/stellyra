@@ -87,7 +87,7 @@ at least one non-default-priority connection exists - the common all-default-pri
 `dispatch(Args...)` has two paths:
 
 - **Fast path**, used when every connection is Direct with no predicates (`nonDirectCount == 0 && predicateCount == 0`): a single lock, a straight walk over active slots, no branching per connection
-- **Slow path**, used otherwise: per-handler predicate evaluation (in the right context), resolved-type dispatch (Direct now, or post to the receiver’s loop for Deferred), and single-shot cleanup immediately after that handler returns — a same-thread call into `disconnectHandler()`, which takes the exclusive lock - this is exactly why `.once()` is rejected on `SharedEvent` (see `ConnParams` above): dispatch there holds only a shared lock, so that immediate disconnect call would deadlock against itself
+- **Slow path**, used otherwise: per-handler predicate evaluation (in the right context), resolved-type dispatch (Direct now, or post to the receiver's loop for Deferred), and single-shot cleanup immediately after that handler returns — a same-thread call into `disconnectHandler()`, which takes the exclusive lock - this is exactly why `.once()` is rejected on `SharedEvent` (see `ConnParams` above): dispatch there holds only a shared lock, so that immediate disconnect call would deadlock against itself
 
 Argument capture for Deferred posting is lazy: the `shared_ptr<tuple<...>>` used to carry arguments across the loop boundary is only allocated once the first Deferred connection is actually encountered during a given dispatch (`ensureCapture()`), not unconditionally.
 
@@ -101,6 +101,8 @@ that both re-resolves its own events' sender-side topology and every tracked rec
 For a receiver that cannot or should not inherit `Trackable`, `Tracked<T>` (in `event_storage.h`) is a two-field aggregate - `{ T& receiver, Trackable& tracker }` - passed to any `connect`/`connectFree`/`connectLambda` overload in place of a bare receiver reference, so a separate, explicitly-owned `Trackable` (aliased as `Anchor`) does the tracking instead.  This is the one non-inheriting receiver pattern in the current design.
 
 Every `Trackable` has one `migrationTag`, shared by every connection where it is the receiver, so when it moves to a different `EventLoop`, all of its pending Deferred tasks migrate together in a single call (`EventLoop::migratePendingTo()`), regardless of which event or connection produced each one.
+
+`Trackable`'s `disconnectAll` - whether run implicitly via `~Trackable()` or explicitly - only takes effect once destruction actually reaches it.  For an inheriting receiver, that's after the derived object's own destructor body and members are already destroyed, since base subobjects always destruct last; a dispatch already in flight when destruction begins can observe the receiver mid-destruction (see `KNOWN_ISSUES.md`).  `EagerDisconnector`, also in `trackable.h`, closes this by inverting the relationship - the wrapper inherits from the receiver's implementation class rather than the other way around, so its destructor (and the `disconnectAll` it runs) is most-derived and executes first.
 
 ## `EventLoop` and `AutoDrainThread` (`event_loop.h`, `auto_drain_thread.h`)
 

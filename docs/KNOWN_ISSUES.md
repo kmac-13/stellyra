@@ -66,11 +66,27 @@ These are findings about the benchmark suite's toolchain and runtime environment
 
 **Practical implication:** `SharedEvent` is not a safe default choice for genuinely contended, concurrent-heavy workloads on MinGW/Windows, despite being the "obviously correct" choice on paper for allowing parallel reads.  `BasicConcurrentEvent` (in `stellyra_extras`, see `ARCHITECTURE.md`) is a lock-free alternative worth benchmarking on this toolchain for that use case, since it never takes a shared/exclusive lock during dispatch at all.
 
+### 5. `std::__shared_mutex_pthread::lock()` assertion failure - single occurrence, not reproduced (Windows/MinGW)
+
+**TL;DR:** A single CI run hit a libstdc++ internal assertion failure inside `std::shared_mutex`'s `lock()` on Windows/MinGW, in the unit test suite's `ThreadSafety.RapidConnectDisconnectStress<std::shared_mutex>` test (not the benchmark harness - logged here anyway since it's the same toolchain/runtime-environment category as the rest of this section); an immediate rerun of the same test passed, and it had not occurred on any run before this one.
+
+**Symptom:**
+```
+D:/a/_temp/msys64/mingw64/include/c++/16.2.0/shared_mutex:205: void std::__shared_mutex_pthread::lock(): Assertion '__ret == 0' failed.
+```
+hit during a test that deliberately contends a `std::shared_mutex`-backed event between a tight-loop dispatch thread and a thread cycling `connect()`/`disconnect()` up to 500 times over roughly 100ms of wall-clock time.
+
+**Root cause - not confirmed, best explanation the evidence supports:** libstdc++'s `__shared_mutex_pthread::lock()` (exclusive/write-lock acquisition) only special-cases `EDEADLK` from the underlying `pthread_rwlock_wrlock()` call; any other nonzero return - including `EAGAIN`, which the same header's `lock_shared()` a few lines later explicitly retries on, with a comment acknowledging "we retry if we exceeded the maximum number of read locks supported..." - hits this assert instead of being handled.  This points at a known class of edge case in MinGW-w64's `winpthreads` `pthread_rwlock_wrlock()` returning `EAGAIN` under heavy writer/reader contention, which libstdc++'s write-lock path (unlike its read-lock path) was never written to tolerate.
+
+**Confidence:** low.  Single occurrence; the same test passed cleanly both before and immediately after a rerun, so this is logged as an observed anomaly, not a confirmed, reproducible bug.
+
+**Practical implication:** no action taken against this entry alone.  If it recurs - especially under similar writer/reader `shared_mutex` contention - this entry should be the starting point rather than re-diagnosing from scratch, and a reproducible case would upgrade entry #4's finding (`shared_mutex` being merely *slow* on MinGW) to a correctness concern, not just a performance one.
+
 ---
 
 ## Benchmark harness bugs (fixed)
 
-### 5. Shutdown race: checking `running` before `arrive()`, not after
+### 6. Shutdown race: checking `running` before `arrive()`, not after
 
 **TL;DR:** Shutdown sequences intermittently hung because a thread could skip its final `arrive()` call; fixed by calling `arrive()` unconditionally every round.
 
@@ -82,7 +98,7 @@ These are findings about the benchmark suite's toolchain and runtime environment
 
 **Confidence:** high - directly reproduced, fixed, and reproduction confirmed clean afterward (10 repeated runs, plus ThreadSanitizer).
 
-### 6. `spinWait()`/`qtSpinWait()` - same `yield()` limitation, different shape
+### 7. `spinWait()`/`qtSpinWait()` - same `yield()` limitation, different shape
 
 **TL;DR:** A separate spin-wait function hung for the same reason as #1, in a shape with no reusable object to own a mutex/condition variable; fixed with a short spin followed by `sleep_for()` polling.
 
@@ -96,7 +112,7 @@ These are findings about the benchmark suite's toolchain and runtime environment
 
 ## Verified correctness properties
 
-### 7. A disconnected or dead handler is never invoked - verified; ensuring the handler is “disconnected” in time is the receiver's responsibility
+### 8. A disconnected or dead handler is never invoked - verified; ensuring the handler is “disconnected” in time is the receiver's responsibility
 
 **TL;DR**: The slot-liveness check and the disconnect/dispatch serialization are real, verified guarantees - but only once a connection is actually disconnected.  Whether that happens in time when a `Trackable`-derived receiver is destroyed concurrently with dispatch is a separate question - see “Known limitations” below.
 
