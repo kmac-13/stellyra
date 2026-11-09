@@ -4,7 +4,7 @@
 
 /**
  * @file trackable.h
- * @brief Trackable base class and Anchor alias.
+ * @brief Trackable base class, Anchor alias, and EagerDisconnector wrapper.
  *
  * A Trackable serves two roles:
  *
@@ -35,6 +35,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <mutex>
+#include <utility>
 #include <vector>
 
 namespace kmac {
@@ -451,6 +452,72 @@ inline std::vector< GenData > Trackable::extractConnectionsTo( EventImplBase* ta
  * across threads.
  */
 using Anchor = Trackable;
+
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Opt-in wrapper that closes the Anchor's remaining gap for an
+ * inheriting receiver: disconnectAll() runs before the wrapped type's own
+ * destructor even begins, rather than after it (see KNOWN_ISSUES.md).
+ *
+ * @section usage Usage - split the implementation from the alias users construct
+ *
+ * EagerDisconnector<T> inherits from T (not the other way around), so that
+ * the wrapper - not the receiver's own implementation class - is the
+ * most-derived type:
+ *
+ * @code
+ * class Receiver_impl : public Trackable { ... };
+ * using Receiver = EagerDisconnector< Receiver_impl >;
+ * @endcode
+ *
+ * `Receiver_impl` holds the actual implementation; `Receiver` is the type
+ * callers are expected to name and construct.  This is deliberately NOT a
+ * CRTP-style `class Receiver : public EagerDisconnector<Receiver>` - that
+ * arrangement would make Receiver itself the most-derived type again,
+ * reproducing the exact ordering this wrapper exists to avoid.
+ *
+ * @section mechanism Why this closes the gap rather than narrowing it
+ *
+ * Because EagerDisconnector<T> is the most-derived type, its destructor is
+ * the first thing to run - before T's destructor body, before any of T's
+ * members, and before Trackable's own (now-redundant) implicit
+ * disconnectAll().  disconnectAll() is its only statement, so there is no
+ * other code in the wrapper's destructor that could run before it: unlike
+ * Anchor (where the owning class's destructor body still runs before
+ * reaching the last-declared member), there is no residual window here for
+ * anything to race against on the way in.  And because disconnectAll() and
+ * invokeDeferred()/dispatch share the same per-event mutex, a dispatch
+ * already mid-execution when this destructor runs is not at risk either -
+ * the destroying thread blocks on that mutex until the in-flight call
+ * completes, before T's destructor (or anything it owns) is touched.
+ *
+ * @section caveat What this does NOT guarantee
+ *
+ * The guarantee above only holds for an object actually constructed as the
+ * wrapped alias (e.g. `Receiver`).  Nothing prevents constructing a bare
+ * `Receiver_impl` directly - that object has no EagerDisconnector anywhere
+ * in its hierarchy, and silently gets none of this protection.  This is a
+ * documented convention, not a compiler-enforced one; see KNOWN_ISSUES.md.
+ *
+ * @tparam T the receiver's own implementation class - must derive from
+ * Trackable (directly or indirectly) for disconnectAll() to be reachable
+ */
+template< typename T >
+class EagerDisconnector : public T
+{
+public:
+	template< typename... Args >
+	explicit EagerDisconnector( Args&&... args )
+		: T( std::forward< Args >( args )... )
+	{
+	}
+
+	~EagerDisconnector() override
+	{
+		this->disconnectAll();
+	}
+};
 
 } // namespace stellyra
 } // namespace kmac

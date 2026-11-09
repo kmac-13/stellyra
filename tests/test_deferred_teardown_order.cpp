@@ -96,34 +96,20 @@ int stressEmissionsPerThread()
 constexpr int RECEIVERS_PER_TRIAL = 6;
 constexpr int EMITTER_THREADS = 4;
 
-struct Receiver : stellyra::Trackable
+struct Receiver_impl : stellyra::Trackable
 {
 	// actually touches member state on every invocation, so a
 	// use-after-free would be a real, detectable write to freed memory,
 	// not a no-op call through a dangling-but-unused this pointer
 	std::atomic< long long > total{ 0 };
 
-	// explicit disconnectAll() call since the Trackable destructor calling
-	// it would be too late for () runs once
-	// this destructor's body and all of Receiver's own members are already
-	// gone. disconnectHandler() (called from here) and invokeDeferred()
-	// (called by the drainer) both serialize on the same EventImpl mutex,
-	// so calling disconnectAll() here blocks until any dispatch already
-	// in flight against this object finishes, and prevents a new one from
-	// starting - closing the window this test exists to exercise. See
-	// trackable.h's ordering section for why this is necessary and what it
-	// does not cover (a destructor with real work before this call would
-	// still be unprotected during that work).
-	~Receiver()
-	{
-		disconnectAll();
-	}
-
 	void onFired( int v )
 	{
 		total.fetch_add( v, std::memory_order_relaxed );
 	}
 };
+
+using Receiver = stellyra::EagerDisconnector< Receiver_impl >;
 
 } // namespace
 
@@ -209,4 +195,50 @@ TYPED_TEST( DeferredTeardownOrderTest, SurvivesReceiverDestroyedBeforeDrainer )
 		<< "either Deferred dispatch isn't working at all, or something "
 		<< "about this test's setup is wrong, not the teardown-order "
 		<< "property this test exists to check";
+}
+
+TEST( EagerDisconnectorTest, DisconnectsBeforeWrappedDestructorRuns )
+{
+	stellyra::Event< int > event;
+
+	struct Receiver_impl : stellyra::Trackable
+	{
+		int lastValue = 0;
+		void onFired( int v ) { lastValue = v; }
+	};
+	using Receiver = stellyra::EagerDisconnector< Receiver_impl >;
+
+	stellyra::Connection conn;
+	{
+		Receiver receiver;
+		conn = event.connect( static_cast< Receiver_impl& >( receiver ), &Receiver_impl::onFired );
+		ASSERT_TRUE( conn.isConnected() );
+	}
+	// receiver is now destroyed
+
+	EXPECT_FALSE( conn.isConnected() )
+		<< "EagerDisconnector did not disconnect the receiver's connections during destruction";
+}
+
+TEST( EagerDisconnectorTest, DisconnectsEvenWhenDeletedThroughBasePointer )
+{
+	stellyra::Event< int > event;
+
+	struct Receiver_impl : stellyra::Trackable
+	{
+		int lastValue = 0;
+		void onFired( int v ) { lastValue = v; }
+	};
+	using Receiver = stellyra::EagerDisconnector< Receiver_impl >;
+
+	auto* receiver = new Receiver();
+	stellyra::Connection conn = event.connect( static_cast< Receiver_impl& >( *receiver ), &Receiver_impl::onFired );
+	ASSERT_TRUE( conn.isConnected() );
+
+	Receiver_impl* asBase = receiver;  // static type narrows to the base
+	delete asBase;                     // must still reach ~EagerDisconnector() via virtual dispatch
+
+	EXPECT_FALSE( conn.isConnected() )
+		<< "deleting through a Receiver_impl* skipped EagerDisconnector's destructor - "
+		<< "virtual dispatch isn't doing what this wrapper depends on";
 }

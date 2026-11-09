@@ -26,7 +26,7 @@ What's specific to Stellyra:
 **Trade-offs to weigh against this:**
 
 - Dispatch has overhead versus a direct call - Stellyra's fast dispatch path and `STELLYRA_THREAD_SAFE=0` minimize this, but it's never zero-cost
-- Execution flow is less linear than an explicit call chain - harder to trace who runs in response to what - but that indirection is the necessary cost of genuine asynchronous dispatch, not a flaw to engineer away, and it’s the same indirection that discourages the forced, tightly-coupled interdependencies described above
+- Execution flow is less linear than an explicit call chain - harder to trace who runs in response to what - but that indirection is the necessary cost of genuine asynchronous dispatch, not a flaw to engineer away, and it's the same indirection that discourages the forced, tightly-coupled interdependencies described above
 - Subscription lifetime has to be managed - `Trackable`/`Tracked<T>` handle the common case automatically (see "Do I need to inherit from Trackable?" below), but the responsibility doesn't disappear entirely
 
 The rest of this FAQ covers what's specific to Stellyra's own design - thread safety, lifetime tracking, deferred execution, and so on.
@@ -95,7 +95,7 @@ Yes.  All connection management operations (`connect`, `disconnect`, `block`, `u
 
 It depends on what "receiver" means for that connection - specifically, whether it has an associated Trackable:
 
-**Receiver inherits Trackable** - nothing bad.  Destroying it runs `Trackable::~Trackable()` (via `disconnectAll()`), which marks every connection it was tracking as inactive on the sender's event, under that event's own mutex; `dispatch()` checks that same slot state under the same lock before invoking anything.  If the receiver has been destroyed, the slot reads as inactive and the invocation is silently skipped.  This guarantee is unconditional for a tracked receiver - it holds regardless of which thread destroys it.
+**Receiver inherits Trackable** - safe once disconnected, but getting there in time is the receiver's job.  Destroying it runs `~Trackable()`, which calls `disconnectAll()`, marking every connection it was tracking as inactive on the sender's event, under that event's own mutex; `dispatch()` checks that same slot state under the same lock before invoking anything.  But `~Trackable()` only runs after the derived object's own destructor body and members are already gone - a dispatch concurrently calling into the receiver at that moment can observe it mid-destruction.  See `KNOWN_ISSUES.md` for the confirmed UBSan finding and `trackable.h`'s `EagerDisconnector` for the structural fix (or an explicit `disconnectAll()` as the first line of your own destructor, for the lighter-weight mitigation).
 
 **Receiver is paired with a standalone `Trackable`/`Anchor` via `Tracked<T>`** - same guarantee, by the same mechanism, as long as the standalone tracker is destroyed no later than the receiver (see "Do I need to inherit from Trackable?" above).  Destroying the external tracker is what runs `disconnectAll()`; the receiver itself doesn't need to do anything.
 
