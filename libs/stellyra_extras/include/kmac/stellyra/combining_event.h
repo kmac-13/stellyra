@@ -170,6 +170,7 @@ struct CombiningEventImpl : EventImplBase
 	 */
 	platform::Atomic< unsigned int > blockDepth { 0 };
 
+// TODO: move to out-of-line definitions
 	bool isBlocked() const noexcept
 	{
 		return blockDepth.load( std::memory_order_relaxed ) > 0;
@@ -457,13 +458,20 @@ public:
 	template< auto Method, typename T >
 	Connection connect( Tracked< T > tracked );
 
-	/// Connect a runtime pointer-to-member-function.
-	template< typename T >
-	Connection connect( T& receiver, ReturnType ( T::*method )( Args... ) );
+	/**
+	 * @brief Connect a runtime pointer-to-member-function.  method may be
+	 * declared on T or on any accessible, unambiguous base of T; T is
+	 * deduced from receiver, not from method's declaring class.
+	 */
+	template< typename T, typename U >
+	Connection connect( T& receiver, ReturnType ( U::*method )( Args... ) );
 
-	/// Runtime PMF connect with explicit tracker.
-	template< typename T >
-	Connection connect( Tracked< T > tracked, ReturnType ( T::*method )( Args... ) );
+	/**
+	 * @brief Runtime PMF connect with explicit tracker.  Same base-of-T
+	 * allowance as the receiver-only overload above.
+	 */
+	template< typename T, typename U >
+	Connection connect( Tracked< T > tracked, ReturnType ( U::*method )( Args... ) );
 
 	/// NTTP single-shot connect.
 	template< auto Method, typename T >
@@ -473,13 +481,19 @@ public:
 	template< auto Method, typename T >
 	Connection connectOnce( Tracked< T > tracked );
 
-	/// Runtime PMF single-shot connect.
-	template< typename T >
-	Connection connectOnce( T& receiver, ReturnType ( T::*method )( Args... ) );
+	/**
+	 * @brief Runtime PMF single-shot connect.  Same base-of-T allowance as
+	 * connect() above.
+	 */
+	template< typename T, typename U >
+	Connection connectOnce( T& receiver, ReturnType ( U::*method )( Args... ) );
 
-	/// Runtime PMF single-shot connect with tracker.
-	template< typename T >
-	Connection connectOnce( Tracked< T > tracked, ReturnType ( T::*method )( Args... ) );
+	/**
+	 * @brief Runtime PMF single-shot connect with tracker.  Same base-of-T
+	 * allowance as connect() above.
+	 */
+	template< typename T, typename U >
+	Connection connectOnce( Tracked< T > tracked, ReturnType ( U::*method )( Args... ) );
 
 	// =========================================================================
 	// free-function connections
@@ -730,16 +744,23 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect( Trac
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-template< typename T >
+template< typename T, typename U >
 inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect(
 	T& receiver,
-	ReturnType ( T::*method )( Args... ) )
+	ReturnType ( U::*method )( Args... ) )
 {
+	static_assert( std::is_base_of_v< U, T >,
+		"connect: method must belong to T or to an accessible, unambiguous base of T" );
+
 	Trackable* tracker = nullptr;
 	if constexpr ( std::is_base_of_v< Trackable, T > )
 	{
 		tracker = static_cast< Trackable* >( &receiver );
 	}
+
+	// receiver.*method calls a base-declared member through the derived
+	// object directly - no cast needed, unlike EventStorage's connect()
+	// which has to store the pointer at a fixed PmfInvoker<T, ...> type
 	return connectImpl(
 		HandlerType::create(
 			[ &receiver, method ]( Args... a ) -> ReturnType {
@@ -749,11 +770,14 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect(
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-template< typename T >
+template< typename T, typename U >
 inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect(
 	Tracked< T > tracked,
-	ReturnType ( T::*method )( Args... ) )
+	ReturnType ( U::*method )( Args... ) )
 {
+	static_assert( std::is_base_of_v< U, T >,
+		"connect: method must belong to T or to an accessible, unambiguous base of T" );
+
 	return connectImpl(
 		HandlerType::create(
 			[ &r = tracked.receiver, method ]( Args... a ) -> ReturnType {
@@ -786,11 +810,14 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce( 
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-template< typename T >
+template< typename T, typename U >
 inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
 	T& receiver,
-	ReturnType ( T::*method )( Args... ) )
+	ReturnType ( U::*method )( Args... ) )
 {
+	static_assert( std::is_base_of_v< U, T >,
+		"connectOnce: method must belong to T or to an accessible, unambiguous base of T" );
+
 	Trackable* tracker = nullptr;
 	if constexpr ( std::is_base_of_v< Trackable, T > )
 	{
@@ -805,11 +832,14 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-template< typename T >
+template< typename T, typename U >
 inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
 	Tracked< T > tracked,
-	ReturnType ( T::*method )( Args... ) )
+	ReturnType ( U::*method )( Args... ) )
 {
+	static_assert( std::is_base_of_v< U, T >,
+		"connectOnce: method must belong to T or to an accessible, unambiguous base of T" );
+
 	return connectImpl(
 		HandlerType::create(
 			[ &r = tracked.receiver, method ]( Args... a ) -> ReturnType {
