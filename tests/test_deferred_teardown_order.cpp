@@ -211,7 +211,7 @@ TEST( EagerDisconnectorTest, DisconnectsBeforeWrappedDestructorRuns )
 	stellyra::Connection conn;
 	{
 		Receiver receiver;
-		conn = event.connect( static_cast< Receiver_impl& >( receiver ), &Receiver_impl::onFired );
+		conn = event.connect( receiver, &Receiver::onFired );
 		ASSERT_TRUE( conn.isConnected() );
 	}
 	// receiver is now destroyed
@@ -232,7 +232,7 @@ TEST( EagerDisconnectorTest, DisconnectsEvenWhenDeletedThroughBasePointer )
 	using Receiver = stellyra::EagerDisconnector< Receiver_impl >;
 
 	auto* receiver = new Receiver();
-	stellyra::Connection conn = event.connect( static_cast< Receiver_impl& >( *receiver ), &Receiver_impl::onFired );
+	stellyra::Connection conn = event.connect( *receiver, &Receiver::onFired );
 	ASSERT_TRUE( conn.isConnected() );
 
 	Receiver_impl* asBase = receiver;  // static type narrows to the base

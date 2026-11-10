@@ -270,14 +270,18 @@ public:
 	 * parameters:
 	 * connect(receiver, &ReceiverType::method, connType, connParams);
 	 *
+	 * @note method may be declared on T or on any accessible, unambiguous
+	 * base of T (e.g. connect(derivedObj, &Base::method, ...)); T is
+	 * deduced from receiver, not from method's declaring class.
+	 *
 	 * @note This form is disconnectable by target via
 	 * disconnect(receiver, method); retaining the returned Connection is
 	 * optional.
 	 */
-	template< typename T, typename... MethodArgs >
+	template< typename T, typename U, typename... MethodArgs >
 	Connection connect(
 		T& receiver,
-		void ( T::*method )( MethodArgs... ),
+		void ( U::*method )( MethodArgs... ),
 		ConnectionType type = ConnectionType::Auto,
 		ConnParams params = {} );
 
@@ -287,14 +291,17 @@ public:
 	 * connection type:
 	 * connect(receiver, &ReceiverType::method, connParams, connType);
 	 *
+	 * @note method may be declared on T or on any accessible, unambiguous
+	 * base of T, exactly as the connType-first overload above accepts.
+	 *
 	 * @note This form is disconnectable by target via
 	 * disconnect(receiver, method); retaining the returned Connection is
 	 * optional.
 	 */
-	template< typename T, typename... MethodArgs >
+	template< typename T, typename U, typename... MethodArgs >
 	Connection connect(
 		T& receiver,
-		void ( T::*method )( MethodArgs... ),
+		void ( U::*method )( MethodArgs... ),
 		ConnParams params,
 		ConnectionType type = ConnectionType::Auto );
 
@@ -637,9 +644,13 @@ public:
 	 * covering connections made via connect(receiver, method).  It matches by
 	 * receiver pointer and native pointer-to-member equality on `method`, and
 	 * removes a single connection as the NTTP form does.
+	 *
+	 * @note method may be declared on T or on any accessible, unambiguous
+	 * base of T, exactly as accepted by connect() - T is deduced from
+	 * receiver, not from method's declaring class.
 	 */
-	template< typename T, typename... MethodArgs >
-	void disconnect( T& receiver, void ( T::*method )( MethodArgs... ) );
+	template< typename T, typename U, typename... MethodArgs >
+	void disconnect( T& receiver, void ( U::*method )( MethodArgs... ) );
 
 	/**
 	 * @brief Removes a single connection matching NTTP free function `Func`,
@@ -817,30 +828,38 @@ inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
 }
 
 template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
-template< typename T, typename... MethodArgs >
+template< typename T, typename U, typename... MethodArgs >
 inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
-	T& receiver, void ( T::*method )( MethodArgs... ),
+	T& receiver, void ( U::*method )( MethodArgs... ),
 	ConnectionType type, ConnParams params )
 {
 	static_assert( sizeof...( MethodArgs ) <= sizeof...( Args ),
 		"connect: method requests more arguments than this event provides" );
+	static_assert( std::is_base_of_v< U, T >,
+		"connect: method must belong to T or to an accessible, unambiguous base of T" );
 
 	Trackable* tracker = nullptr;
 	if constexpr ( std::is_base_of_v< Trackable, T > )
 	{
 		tracker = static_cast< Trackable* >( &receiver );
 	}
+
+	// implicit Base::* -> Derived::* conversion: stored keyed on the
+	// receiver's actual type T, regardless of which base U method was
+	// declared on, so disconnect(receiver, method) still finds it by
+	// native pointer-to-member equality
+	void ( T::*upcastMethod )( MethodArgs... ) = method;
 	return connectImpl(
 		HandlerType::create(
-			detail::PmfInvoker< void ( Args... ), T, MethodArgs... >{ &receiver, method } ),
+			detail::PmfInvoker< void ( Args... ), T, MethodArgs... >{ &receiver, upcastMethod } ),
 		tracker, type, true, params.prio(),
 		params.hasPredicate(), params.predicate(), params.predicateContext(), params.isSingleShot() );
 }
 
 template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
-template< typename T, typename... MethodArgs >
+template< typename T, typename U, typename... MethodArgs >
 inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
-	T& receiver, void ( T::*method )( MethodArgs... ),
+	T& receiver, void ( U::*method )( MethodArgs... ),
 	ConnParams params, ConnectionType type )
 {
 	return connect( receiver, method, type, std::move( params ) );
@@ -1153,24 +1172,30 @@ inline void EventStorage< ImplT, MutexType, Args... >::disconnectFree(
 }
 
 template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
-template< typename T, typename... MethodArgs >
-inline void EventStorage< ImplT, MutexType, Args... >::disconnect( T& receiver, void ( T::*method )( MethodArgs... ) )
+template< typename T, typename U, typename... MethodArgs >
+inline void EventStorage< ImplT, MutexType, Args... >::disconnect( T& receiver, void ( U::*method )( MethodArgs... ) )
 {
 	static_assert( sizeof...( MethodArgs ) <= sizeof...( Args ),
 		"disconnect: method requests more arguments than this event provides" );
+	static_assert( std::is_base_of_v< U, T >,
+		"disconnect: method must belong to T or to an accessible, unambiguous base of T" );
 
-	// connect(receiver, method) stores a PmfInvoker; recover it by exact type
-	// and compare the receiver pointer and method directly - matching by the
-	// functor's fields means no comparison Callable is constructed, so this
-	// path allocates nothing
+	// connect(receiver, method) stores a PmfInvoker keyed on T; recover it by
+	// exact type and compare the receiver pointer and method directly -
+	// matching by the functor's fields means no comparison Callable is
+	// constructed, so this path allocates nothing; method is upcast to
+	// T::* first (the same implicit Base::* -> Derived::* conversion
+	// connect() applies) so a base-class spelling at the call site still
+	// matches what connect() stored
 	using Invoker = detail::PmfInvoker< void ( Args... ), T, MethodArgs... >;
+	void ( T::*upcastMethod )( MethodArgs... ) = method;
 
 	auto toDisconnect = _impl->findFirstMatch(
 		[ & ]( const HandlerType& handler ) {
 			const Invoker* candidate = handler.template targetAs< Invoker >();
 			return candidate
 				&& candidate->_receiver == &receiver
-				&& candidate->_method == method;
+				&& candidate->_method == upcastMethod;
 		} );
 	_impl->disconnectHandlers( toDisconnect );
 }
