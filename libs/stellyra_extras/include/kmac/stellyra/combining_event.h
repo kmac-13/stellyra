@@ -170,26 +170,11 @@ struct CombiningEventImpl : EventImplBase
 	 */
 	platform::Atomic< unsigned int > blockDepth { 0 };
 
-// TODO: move to out-of-line definitions
-	bool isBlocked() const noexcept
-	{
-		return blockDepth.load( std::memory_order_relaxed ) > 0;
-	}
+	bool isBlocked() const noexcept;
 
-	void block() noexcept
-	{
-		blockDepth.fetch_add( 1, std::memory_order_relaxed );
-	}
+	void block() noexcept;
 
-	void unblock() noexcept
-	{
-		unsigned int current = blockDepth.load( std::memory_order_relaxed );
-		while ( current > 0
-			&& ! blockDepth.compare_exchange_weak(
-				current, current - 1, std::memory_order_relaxed ) )
-		{
-		}
-	}
+	void unblock() noexcept;
 
 	// ---- EventImplBase overrides -------------------------------------------
 
@@ -237,6 +222,28 @@ private:
 };
 
 // ---------------------------------------------------------------------------
+
+template< typename ReturnType, typename... Args >
+inline bool CombiningEventImpl< ReturnType, Args... >::isBlocked() const noexcept
+{
+	return blockDepth.load( std::memory_order_relaxed ) > 0;
+}
+
+template< typename ReturnType, typename... Args >
+inline void CombiningEventImpl< ReturnType, Args... >::block() noexcept
+{
+	blockDepth.fetch_add( 1, std::memory_order_relaxed );
+}
+
+template< typename ReturnType, typename... Args >
+inline void CombiningEventImpl< ReturnType, Args... >::unblock() noexcept
+{
+	unsigned int current = blockDepth.load( std::memory_order_relaxed );
+	while ( current > 0
+		&& ! blockDepth.compare_exchange_weak( current, current - 1, std::memory_order_relaxed ) )
+	{
+	}
+}
 
 template< typename ReturnType, typename... Args >
 inline bool CombiningEventImpl< ReturnType, Args... >::isHandlerConnected( uint32_t index, uint32_t generation ) const

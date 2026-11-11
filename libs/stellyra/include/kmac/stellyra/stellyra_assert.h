@@ -4,25 +4,30 @@
 
 /**
  * @file stellyra_assert.h
- * @brief STELLYRA_ASSERT_ALWAYS - a hard assertion that survives NDEBUG.
+ * @brief stellyra_assert_always - a hard assertion that survives NDEBUG.
  *
  * Plain assert() compiles to nothing at all when NDEBUG is defined, which
  * is the standard convention for release builds - meaning a plain assert()
  * guarding a genuine misuse (as opposed to a debugging aid) silently
  * disappears in exactly the build configuration most deployed code runs
  * in, and the program proceeds straight into whatever the assert was
- * meant to catch.  STELLYRA_ASSERT_ALWAYS checks its condition
+ * meant to catch.  stellyra_assert_always checks its condition
  * unconditionally, in every build, and terminates immediately via
  * std::abort() on failure - std::abort() itself takes no message, so the
  * message is printed to stderr first.  There is no way to catch or
  * recover from this: use it only for conditions that indicate a genuine
  * API misuse with no well-defined way to continue.
+ *
+ * Named lowercase, like assert() itself, because it's invoked like a
+ * function at a call site - not checked like a build-config flag the way
+ * every other STELLYRA_* (SCREAMING_SNAKE_CASE) name in this library is
+ * (STELLYRA_THREAD_SAFE, STELLYRA_LOG_CONNECTION_ISSUES, etc.).
  */
 
 #include <cstdio>
 #include <cstdlib>
 
-#define STELLYRA_ASSERT_ALWAYS( condition, message ) \
+#define stellyra_assert_always( condition, message ) \
 	do \
 	{ \
 		if ( ! ( condition ) ) \

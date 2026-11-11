@@ -36,7 +36,7 @@ struct HasLockShared< M, std::void_t< decltype( std::declval< M& >().lock_shared
 	: std::true_type {};
 
 template< typename M >
-inline constexpr bool HasLockShared_v = HasLockShared< M >::value;
+inline constexpr bool HasLockShared_value = HasLockShared< M >::value;
 
 // ---------------------------------------------------------------------------
 
@@ -61,7 +61,7 @@ struct ExtractReceiver< Ret ( Class::* )( Args... ) const >
 };
 
 template< typename Method >
-using ExtractReceiver_t = typename ExtractReceiver< Method >::type;
+using ExtractReceiver_type = typename ExtractReceiver< Method >::type;
 
 /**
  * @brief Wraps T in a non-deduced context so the compiler does not try
@@ -77,7 +77,7 @@ struct NonDeduced
 };
 
 template< typename T >
-using NonDeduced_t = typename NonDeduced< T >::type;
+using NonDeduced_type = typename NonDeduced< T >::type;
 
 /**
  * @brief Number of parameters declared on a member function pointer.

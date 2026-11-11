@@ -57,7 +57,7 @@ inline GenData::GenData( uint32_t idx, uint16_t gen )
 	: index( static_cast< uint16_t >( idx ) )
 	, generation( gen )
 {
-	STELLYRA_ASSERT_ALWAYS( idx <= UINT16_MAX,
+	stellyra_assert_always( idx <= UINT16_MAX,
 		"handler index exceeds GenData's 16-bit range - this event has more "
 		"simultaneously connected handlers than a single event supports" );
 }

@@ -271,7 +271,7 @@ inline bool ConnParams< MutexType, Args... >::isSingleShot() const
 template< typename MutexType, typename... Args >
 inline ConnParams< MutexType, Args... >&& ConnParams< MutexType, Args... >::once()
 {
-	static_assert( ! detail::HasLockShared_v< MutexType >,
+	static_assert( ! detail::HasLockShared_value< MutexType >,
 		"once(): single-shot connections are not supported on SharedEvent (SharedMutex): "
 		"disconnecting from within a handler while a SharedLock is held would deadlock. "
 		"Use a manual ScopedConnection instead." );

@@ -219,7 +219,7 @@ namespace detail {
 template< typename MutexType, typename Mutex, typename Body >
 void withImplLock( Mutex& mutex, Body&& body )
 {
-	if constexpr ( HasLockShared_v< MutexType > )
+	if constexpr ( HasLockShared_value< MutexType > )
 	{
 		platform::SharedLock< MutexType > lock( mutex );
 		body();

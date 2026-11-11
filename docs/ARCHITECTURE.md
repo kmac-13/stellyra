@@ -122,7 +122,7 @@ A second, lock-free primary event type.  Each slot is a `std::atomic<Entry*>`, r
 
 ### `EpochDomain` (`epoch_domain.h`)
 
-A small epoch-based-reclamation (EBR) utility backing `BasicConcurrentEvent`: readers announce "active" for the duration of a whole `dispatch()` call (not per-object), and a writer's `retire()` defers freeing until no reader could still be inside a critical section that started before the retired object was removed.  Reader-slot pool size is fixed at compile time via `STELLYRA_MAX_CONCURRENT_TRIGGERS` (default 32); exceeding it fails loudly via STELLYRA_ASSERT_ALWAYS (never compiled out by NDEBUG) rather than corrupting anything.
+A small epoch-based-reclamation (EBR) utility backing `BasicConcurrentEvent`: readers announce "active" for the duration of a whole `dispatch()` call (not per-object), and a writer's `retire()` defers freeing until no reader could still be inside a critical section that started before the retired object was removed.  Reader-slot pool size is fixed at compile time via `STELLYRA_MAX_CONCURRENT_TRIGGERS` (default 32); exceeding it fails loudly via `stellyra_assert_always` (never compiled out by NDEBUG) rather than corrupting anything.
 
 ### `CombiningEvent<Combiner, ReturnType, Args...>` (`combining_event.h`, `combiners.h`)
 
@@ -165,4 +165,4 @@ Read-only, lock-respecting inspection of a live event's connection table - per-c
 - `config.h` - logging tags and the optional Nova logging integration (`STELLYRA_USE_NOVA`), plus the `STELLYRA_LOG_CONNECTION_ISSUES` compile flag for connection-misconfiguration warnings (off by default, zero
   overhead when off)
 - `version.h` - compile-time version macros/constants
-- `stellyra_assert.h` - `STELLYRA_ASSERT_ALWAYS`, a hard assertion that is never compiled out by `NDEBUG` (unlike plain `assert`), for conditions indicating genuine API misuse with no well-defined way to continue
+- `stellyra_assert.h` - `stellyra_assert_always`, a hard assertion that is never compiled out by `NDEBUG` (unlike plain `assert`), for conditions indicating genuine API misuse with no well-defined way to continue
