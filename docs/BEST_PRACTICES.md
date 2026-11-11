@@ -8,10 +8,11 @@ Stellyra is designed to make event-driven programming safe and efficient.  This 
 
 1. [Basic Usage Patterns](#basic-usage-patterns)
 2. [Connection Management](#connection-management)
-3. [Thread Safety](#thread-safety)
-4. [Performance Tips](#performance-tips)
-5. [Common Mistakes](#common-mistakes)
-6. [Multi-Threaded Examples](#multi-threaded-examples)
+3. [Event Forwarding and Private Events](#event-forwarding-and-private-events)
+4. [Thread Safety](#thread-safety)
+5. [Performance Tips](#performance-tips)
+6. [Common Mistakes](#common-mistakes)
+7. [Multi-Threaded Examples](#multi-threaded-examples)
 
 ---
 
@@ -232,6 +233,90 @@ public:
 	}
 };
 ```
+
+---
+
+## Event Forwarding and Private Events
+
+### forwardTo() and forwardFrom()
+
+`forwardTo()` wires a source event so that every emission also calls a target event's `operator()`.  `forwardFrom()` is the same relationship written from the destination's side - useful when the destination is the one doing the wiring, or when the source can't be named as a `TargetEvent` (see the private-event case below):
+
+```cpp
+class Source {
+public:
+	stellyra::Event< int, int > moved { this };
+};
+
+class Target {
+public:
+	stellyra::Event< int, int > relayed { this };
+
+	void wire( Source& source ) {
+		relayed.forwardFrom( source );   // same effect as: source.moved.forwardTo( relayed );
+	}
+};
+```
+
+Both directions go through the same underlying mechanism, so they share the same tracking rules as an ordinary `connect()`: the forward is auto-sourced from the **destination's** `owner()` (if it has a `Trackable` owner) and severed when that owner is destroyed - not the source's.
+
+### Partial-Argument Matching
+
+The target doesn't need to accept every argument the source emits - it only needs to accept a **positional prefix** of them, first N, in order.  Trailing arguments are dropped:
+
+```cpp
+stellyra::Event< int, std::string, double > source;
+stellyra::Event< int, std::string >         target;   // first two args of source - OK
+stellyra::Event< int >                      target2;  // first one - also OK
+
+source.forwardTo( target );     // target gets (int, string); the double is dropped
+target2.forwardFrom( source );  // target2 gets (int); string and double are dropped
+```
+
+This is enforced at compile time (a target requesting more arguments, or arguments out of order, fails to compile).  What it does **not** support is dropping *leading* arguments, picking an arbitrary subset, or reordering.  For any of those, connect a lambda instead; forwarding is deliberately limited to the simple prefix case, since anything more general is already lambdas' job.
+
+### Forwarding Into a Private Event
+
+`forwardTo()` needs `&TargetEvent::operator()` to be nameable at the call site, which fails to compile if the target is a `BasicPrivateEvent` - `operator()` is protected there, and the class attempting the forward isn't a friend of it.  Use `forwardFrom()` instead, called from a method that *is* a friend (the natural owner, or a listed friend in a multi-owner `EventFriendTypeList`):
+
+```cpp
+class Button : public stellyra::Trackable {
+public:
+	stellyra::PrivateEvent< EventFriendTypeList< Button, Setup >, int, int > clicked { this };
+};
+
+class Setup {
+public:
+	static void wire( Source& source, Button& button ) {
+		button.clicked.forwardFrom( source );   // OK: Setup is a listed friend
+	}
+};
+```
+
+### Private Events: Single- vs. Multi-Owner
+
+`PrivateEvent<Owner, Args...>` (`PEvent<Owner, Args...>` alias) is the common case: external code can `connect()`, but only `Owner` can trigger it.
+
+`PrivateEvent<EventFriendTypeList<Types...>, Args...>` is the opt-in multi-friend form, for when more than one class legitimately needs trigger access - most often a decoupling `Setup`-style class that wires two otherwise-unrelated owners' events together via `forwardFrom()`, as above.  It needs friend access to the destination event it's wiring into, alongside that event's natural owner.
+
+### ⚠️ A Private Event Cannot Be Passed Where a `BasicEvent&` Is Expected
+
+This holds even for the owner itself - it's not just external code that's blocked:
+
+```cpp
+class Owner {
+public:
+	stellyra::PrivateEvent< Owner, int > sig { this };
+
+	void tryUpcast() {
+		takesBase( sig );   // compile error, even here, even though Owner is the friend
+	}
+
+	static void takesBase( stellyra::BasicEvent< int >& ) { }
+};
+```
+
+The reason is structural, not an oversight: the actual private inheritance edge (`BasicEvent` as a *private* base) lives on an internal implementation class, not on `PrivateEvent` itself or on whichever outer layer a given friend was granted on.  Friendship granted to `Owner` lets it reach that outer layer's own members - including the forwarding/triggering methods, via ordinary protected-member access through an object of the derived type - but it doesn't reach a private-base conversion rooted two levels further down, because friendship doesn't propagate down an inheritance chain to cover an access check anchored at a different class.  If you need to pass a private event's owner-side authority around, pass the `Owner` (or a method on it) rather than trying to hand out a `BasicEvent&`.
 
 ---
 
