@@ -293,7 +293,7 @@ inline EpochDomain::Guard EpochDomain::enter() const
 		std::this_thread::yield();
 	}
 
-	STELLYRA_ASSERT_ALWAYS( false, "EpochDomain: reader slot pool exhausted - increase readerSlotCount" );
+	stellyra_assert_always( false, "EpochDomain: reader slot pool exhausted - increase readerSlotCount" );
 	return Guard();
 }
 

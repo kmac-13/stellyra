@@ -246,9 +246,9 @@ public:
 	 * parameters:
 	 * connect<&ReceiverType::method>({receiver, tracker}, connType, connParams);
 	 */
-	template< auto Method, typename T = detail::ExtractReceiver_t< decltype( Method ) > >
+	template< auto Method, typename T = detail::ExtractReceiver_type< decltype( Method ) > >
 	Connection connect(
-		detail::NonDeduced_t< Tracked< T > > tracked,
+		detail::NonDeduced_type< Tracked< T > > tracked,
 		ConnectionType type = ConnectionType::Auto,
 		ConnParams params = {} );
 
@@ -258,9 +258,9 @@ public:
 	 * type:
 	 * connect<&ReceiverType::method>({receiver, tracker}, connParams, connType);
 	 */
-	template< auto Method, typename T = detail::ExtractReceiver_t< decltype( Method ) > >
+	template< auto Method, typename T = detail::ExtractReceiver_type< decltype( Method ) > >
 	Connection connect(
-		detail::NonDeduced_t< Tracked< T > > tracked,
+		detail::NonDeduced_type< Tracked< T > > tracked,
 		ConnParams params,
 		ConnectionType type = ConnectionType::Auto );
 
@@ -317,7 +317,7 @@ public:
 	 */
 	template< typename T, typename... MethodArgs >
 	Connection connect(
-		detail::NonDeduced_t< Tracked< T > > tracked,
+		detail::NonDeduced_type< Tracked< T > > tracked,
 		void ( T::*method )( MethodArgs... ),
 		ConnectionType type = ConnectionType::Auto,
 		ConnParams params = {} );
@@ -334,7 +334,7 @@ public:
 	 */
 	template< typename T, typename... MethodArgs >
 	Connection connect(
-		detail::NonDeduced_t< Tracked< T > > tracked,
+		detail::NonDeduced_type< Tracked< T > > tracked,
 		void ( T::*method )( MethodArgs... ),
 		ConnParams params,
 		ConnectionType type = ConnectionType::Auto );
@@ -801,7 +801,7 @@ inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
 template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
 template< auto Method, typename T >
 inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
-	detail::NonDeduced_t< Tracked< T > > tracked,
+	detail::NonDeduced_type< Tracked< T > > tracked,
 	ConnectionType type, ConnParams params )
 {
 	HandlerType handler;
@@ -821,7 +821,7 @@ inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
 template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
 template< auto Method, typename T >
 inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
-	detail::NonDeduced_t< Tracked< T > > tracked,
+	detail::NonDeduced_type< Tracked< T > > tracked,
 	ConnParams params, ConnectionType type )
 {
 	return connect< Method, T >( tracked, type, std::move( params ) );
@@ -868,7 +868,7 @@ inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
 template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
 template< typename T, typename... MethodArgs >
 inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
-	detail::NonDeduced_t< Tracked< T > > tracked,
+	detail::NonDeduced_type< Tracked< T > > tracked,
 	void ( T::*method )( MethodArgs... ),
 	ConnectionType type, ConnParams params )
 {
@@ -885,7 +885,7 @@ inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
 template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
 template< typename T, typename... MethodArgs >
 inline Connection EventStorage< ImplT, MutexType, Args... >::connect(
-	detail::NonDeduced_t< Tracked< T > > tracked,
+	detail::NonDeduced_type< Tracked< T > > tracked,
 	void ( T::*method )( MethodArgs... ),
 	ConnParams params, ConnectionType type )
 {

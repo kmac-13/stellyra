@@ -264,7 +264,7 @@ struct BasicEventImpl : EventImplBase
 	 * dispatch order (see `order`/priorityConnCount above), each according
 	 * to its own resolved connection type.  Called by BasicEvent::operator().
 	 *
-	 * Two lock strategies, chosen at compile time via HasLockShared_v:
+	 * Two lock strategies, chosen at compile time via HasLockShared_value:
 	 *   - SharedMutex (SharedEvent): takes a SharedLock, so concurrent
 	 *     triggers from multiple threads can dispatch in parallel; connect/
 	 *     disconnect take the exclusive lock and so block until dispatch
@@ -430,7 +430,7 @@ inline void BasicEventImpl< MutexType, Args... >::unblock() noexcept
 template< typename MutexType, typename... Args >
 bool BasicEventImpl< MutexType, Args... >::isHandlerConnected( uint32_t index, uint32_t generation ) const
 {
-	if constexpr ( detail::HasLockShared_v< MutexType > )
+	if constexpr ( detail::HasLockShared_value< MutexType > )
 	{
 		platform::SharedLock< MutexType > lock( mutex );
 		return isSlotLive( index, generation );
@@ -474,7 +474,7 @@ void BasicEventImpl< MutexType, Args... >::disconnectHandlers( const std::vector
 template< typename MutexType, typename... Args >
 bool BasicEventImpl< MutexType, Args... >::isHandlerBlocked( uint32_t index, uint32_t generation ) const
 {
-	if constexpr ( detail::HasLockShared_v< MutexType > )
+	if constexpr ( detail::HasLockShared_value< MutexType > )
 	{
 		platform::SharedLock< MutexType > lock( mutex );
 		if ( ! isSlotLive( index, generation ) )
@@ -846,7 +846,7 @@ void BasicEventImpl< MutexType, Args... >::dispatch( Args... args )
 		}
 	};
 
-	if constexpr ( detail::HasLockShared_v< MutexType > )
+	if constexpr ( detail::HasLockShared_value< MutexType > )
 	{
 		platform::SharedLock< MutexType > lock( mutex );
 
