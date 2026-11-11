@@ -36,6 +36,9 @@ class BasicEvent;  ///< see event.h
 template< typename FriendType, typename MutexType, typename... Args >
 class BasicPrivateEvent;  ///< see private_event.h
 
+template< typename... Types >
+struct EventFriendTypeList;  ///< see private_event.h - opt-in multi-friend BasicPrivateEvent
+
 // template< typename MutexType, typename... Args >
 // class EventImpl;
 
