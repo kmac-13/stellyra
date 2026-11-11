@@ -23,7 +23,7 @@
 
 namespace {
 
-class Receiver
+class Receiver : public stellyra::Trackable
 {
 public:
 	void onValue( int x ) { lastX = x; ++callCount; }
