@@ -166,7 +166,7 @@ public:
 - **ScopedConnection** - RAII wrapper that disconnects when it goes out of scope
 
 ### Encapsulation
-- **PrivateEvent** - `PrivateEvent<Owner, Args...>` (`PEvent<Owner, Args...>` alias) allows external `connect()` but restricts triggering to the owner class; enforced at compile time via the type system
+- **PrivateEvent** - `PrivateEvent<Owner, Args...>` (`PEvent<Owner, Args...>` alias) allows external `connect()` but restricts triggering to the owner class; enforced at compile time via the type system. `PrivateEvent<EventFriendTypeList<Types...>, Args...>` is the opt-in multi-friend form, for when more than one class legitimately needs trigger access (e.g. a decoupling class wiring two otherwise-unrelated owners' events together via `forwardFrom()`)
 
 ### Extended Features (`stellyra_extras.h`)
 - **ConnectionGroup** - manages a set of connections across multiple events as a unit

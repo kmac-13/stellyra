@@ -75,6 +75,64 @@ public:
 
 	/// Identical to operator().
 	void emit( Args... args );
+
+	/**
+	 * @brief Connects `sourceEvent` so that triggering it also triggers
+	 * *this* event - the destination-side counterpart to
+	 * EventStorage::forwardTo().
+	 *
+	 * forwardTo() is written on the source ("xChanged.forwardTo(moved)")
+	 * and needs `&TargetEvent::operator()` to be nameable (and therefore
+	 * accessible) at the call site, which fails to compile when the target
+	 * is a BasicPrivateEvent.  forwardFrom() is written on the destination
+	 * ("moved.forwardFrom(xChanged)") instead, and - rather than duplicate
+	 * forwardTo()'s machinery - just delegates to it with the roles
+	 * swapped: `sourceEvent.forwardTo( *this, ... )`.  The key is *where*
+	 * that delegation happens: since forwardFrom() is itself a member of
+	 * BasicEvent, `*this` here has the plain `BasicEvent<MutexType, Args...>`
+	 * static type, never whatever derived type (e.g. BasicPrivateEvent)
+	 * the actual object might be - so forwardTo() deduces its TargetEvent
+	 * template parameter as that plain type, and the `&TargetEvent::operator()`
+	 * it names is always `&BasicEvent<MutexType,Args...>::operator()`, never
+	 * a derived type's name.  This is what lets forwardFrom() work when
+	 * `this` is (via the derived BasicPrivateEvent's using-declaration)
+	 * actually a private event: the derived type's name, and therefore its
+	 * access restriction, never enters into it.
+	 *
+	 * `sourceEvent`'s argument list must have this event's Args... as its
+	 * first-N prefix - the same createPartial-enforced rule forwardTo()
+	 * documents, just applied in the other direction.  The forwarding
+	 * connection's tracker is auto-sourced from *this* event's own
+	 * owner() (not sourceEvent's), mirroring forwardTo()'s "track from the
+	 * trigger side" convention, reversed; if this event has no owner, the
+	 * forwarding connection is untracked, the same trust model as
+	 * connectFree() with no tracker.
+	 *
+	 * On a BasicPrivateEvent, forwardFrom() is reachable only by the
+	 * event's listed friend type(s) - it sits with operator()/trigger()/
+	 * emit() behind that restriction, not with the public connect-style
+	 * API, because wiring a source event to forward into this one hands
+	 * whoever can fire that source the power to fire this event too.
+	 *
+	 * @code
+	 * moved.forwardFrom( xChanged );  // xChanged(int) -> moved()
+	 * @endcode
+	 */
+	template< typename SourceEvent >
+	Connection forwardFrom(
+		SourceEvent& sourceEvent,
+		ConnectionType type = ConnectionType::Auto,
+		typename SourceEvent::ConnParams params = {} );
+
+	/**
+	 * @brief Same as the type-first forwardFrom() above, with the last two
+	 * arguments swapped: moved.forwardFrom( xChanged, connParams, connType );
+	 */
+	template< typename SourceEvent >
+	Connection forwardFrom(
+		SourceEvent& sourceEvent,
+		typename SourceEvent::ConnParams params,
+		ConnectionType type = ConnectionType::Auto );
 };
 
 
@@ -134,6 +192,31 @@ template< typename MutexType, typename... Args >
 inline void BasicEvent< MutexType, Args... >::emit( Args... args )
 {
 	operator()( std::forward< Args >( args )... );
+}
+
+
+// ===========================================================================
+// forwardFrom
+// ===========================================================================
+
+template< typename MutexType, typename... Args >
+template< typename SourceEvent >
+inline Connection BasicEvent< MutexType, Args... >::forwardFrom(
+	SourceEvent& sourceEvent,
+	ConnectionType type,
+	typename SourceEvent::ConnParams params )
+{
+	return sourceEvent.forwardTo( *this, type, std::move( params ) );
+}
+
+template< typename MutexType, typename... Args >
+template< typename SourceEvent >
+inline Connection BasicEvent< MutexType, Args... >::forwardFrom(
+	SourceEvent& sourceEvent,
+	typename SourceEvent::ConnParams params,
+	ConnectionType type )
+{
+	return forwardFrom( sourceEvent, type, std::move( params ) );
 }
 
 } // namespace stellyra
