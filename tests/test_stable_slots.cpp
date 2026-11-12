@@ -23,7 +23,7 @@ template< typename EventT >
 class StableSlots : public ::testing::Test {};
 
 using EventTypes = ::testing::Types<
-	stellyra::Event< int >,
+	stellyra::RecursiveEvent< int >,
 	stellyra::SharedEvent< int >,
 	stellyra::SingleThreadedEvent< int > >;
 TYPED_TEST_SUITE( StableSlots, EventTypes );
@@ -117,7 +117,7 @@ template< typename EventT >
 class StableSlotsReentrant : public ::testing::Test {};
 
 using ReentrantEventTypes = ::testing::Types<
-	stellyra::Event< int >,
+	stellyra::RecursiveEvent< int >,
 	stellyra::SingleThreadedEvent< int > >;
 TYPED_TEST_SUITE( StableSlotsReentrant, ReentrantEventTypes );
 

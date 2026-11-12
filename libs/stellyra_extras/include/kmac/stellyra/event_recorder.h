@@ -26,7 +26,7 @@
  * manual wiring is only required when using EventRecorder standalone.
  *
  * @code
- * RecordableEvent< float > reading { this };
+ * RecursiveRecordableEvent< float > reading { this };
  *
  * reading.recorder().startRecording( 100 );   // keep last 100 emissions
  * // ... run sensor for a while ...

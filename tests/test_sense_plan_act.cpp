@@ -124,7 +124,7 @@ template< typename EventT >
 class SensePlanAct : public ::testing::Test {};
 
 using EventTypes = ::testing::Types<
-	stellyra::Event< int >,
+	stellyra::RecursiveEvent< int >,
 	stellyra::SharedEvent< int >,
 	stellyra::SingleThreadedEvent< int > >;
 TYPED_TEST_SUITE( SensePlanAct, EventTypes );

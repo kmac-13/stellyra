@@ -4,10 +4,25 @@
 
 /**
  * @file event.h
- * @brief BasicEvent<MutexType, Args...> - the triggerable event type.
+ * @brief GenericEvent<MutexType, Args...> - the triggerable event type, and
+ * BasicEvent<MutexType, Args...> - a resolving alias over it.
  *
- * BasicEvent inherits all connection management from EventStorage and adds
+ * GenericEvent inherits all connection management from EventStorage and adds
  * operator() / trigger() / emit() for dispatching to connected handlers.
+ * BasicEvent is a thin alias over GenericEvent that additionally accepts the
+ * function-style signature form (see event_signature.h) - both options,
+ * BasicEvent<M, Args...> and BasicEvent<M, void(Args...)>, resolve to the
+ * exact same GenericEvent<M, Args...> type, the same guarantee
+ * RecursiveEvent/SharedEvent/SingleThreadedEvent already give.  For a plain
+ * Args... pack the two names are simply interchangeable
+ * (BasicEvent<M, Args...> and GenericEvent<M, Args...> are, again, the same
+ * type) - only BasicEvent supports the function-style, otherwise either
+ * BasicEvent or GenericEvent, whichever reads better at the call site.
+ * Friend grants, forward declarations, and inheritance elsewhere in this
+ * library name GenericEvent directly because an alias template has no
+ * incomplete form, so it can't be forward-declared or used as a
+ * friend-template/template-template-parameter target - not because
+ * GenericEvent itself is discouraged for ordinary use.
  *
  * Public API is focused here.  Implementation details live in:
  *   event_storage.h : EventStorage<MutexType, Args...> - connect/disconnect/block
@@ -17,40 +32,46 @@
  */
 
 #include "basic_event_impl.h"
+#include "event_signature.h"
 #include "event_storage.h"
 
 #include <memory>
 #include <tuple>
+#include <type_traits>
 #include <utility>
 
 namespace kmac {
 namespace stellyra {
 
 // ===========================================================================
-// BasicEvent
+// GenericEvent
 // ===========================================================================
 
 /**
  * @brief Triggerable event.  Inherits connection management from EventStorage
  * and adds operator() / trigger() / emit().
  *
+ * This is the underlying class; BasicEvent (below) is the alias calling code
+ * should name instead - it additionally accepts the function-style
+ * signature form.
+ *
  * @tparam MutexType synchronisation strategy
  * @tparam Args argument types forwarded to connected handlers
  */
 template< typename MutexType, typename... Args >
-class BasicEvent : public EventStorage< kmac::stellyra::BasicEventImpl, MutexType, Args... >
+class GenericEvent : public EventStorage< kmac::stellyra::BasicEventImpl, MutexType, Args... >
 {
 	using Base = EventStorage< kmac::stellyra::BasicEventImpl, MutexType, Args... >;
 
 public:
 	using Base::Base;  // inherit constructors
 
-	~BasicEvent() = default;
+	~GenericEvent() = default;
 
-	BasicEvent( const BasicEvent& ) = delete;
-	BasicEvent& operator=( const BasicEvent& ) = delete;
-	BasicEvent( BasicEvent&& ) = default;
-	BasicEvent& operator=( BasicEvent&& ) = default;
+	GenericEvent( const GenericEvent& ) = delete;
+	GenericEvent& operator=( const GenericEvent& ) = delete;
+	GenericEvent( GenericEvent&& ) = default;
+	GenericEvent& operator=( GenericEvent&& ) = default;
 
 	/**
 	 * @brief Trigger the event - dispatch to all connected handlers.
@@ -89,15 +110,16 @@ public:
 	 * forwardTo()'s machinery - just delegates to it with the roles
 	 * swapped: `sourceEvent.forwardTo( *this, ... )`.  The key is *where*
 	 * that delegation happens: since forwardFrom() is itself a member of
-	 * BasicEvent, `*this` here has the plain `BasicEvent<MutexType, Args...>`
-	 * static type, never whatever derived type (e.g. BasicPrivateEvent)
-	 * the actual object might be - so forwardTo() deduces its TargetEvent
-	 * template parameter as that plain type, and the `&TargetEvent::operator()`
-	 * it names is always `&BasicEvent<MutexType,Args...>::operator()`, never
-	 * a derived type's name.  This is what lets forwardFrom() work when
-	 * `this` is (via the derived BasicPrivateEvent's using-declaration)
-	 * actually a private event: the derived type's name, and therefore its
-	 * access restriction, never enters into it.
+	 * GenericEvent, `*this` here has the plain
+	 * `GenericEvent<MutexType, Args...>` static type, never whatever derived
+	 * type (e.g. BasicPrivateEvent) the actual object might be - so
+	 * forwardTo() deduces its TargetEvent template parameter as that plain
+	 * type, and the `&TargetEvent::operator()` it names is always
+	 * `&GenericEvent<MutexType,Args...>::operator()`, never a derived type's
+	 * name.  This is what lets forwardFrom() work when `this` is (via the
+	 * derived  BasicPrivateEvent's using-declaration) actually a private
+	 * event: the  derived type's name, and therefore its access restriction,
+	 * never enters into it.
 	 *
 	 * `sourceEvent`'s argument list must have this event's Args... as its
 	 * first-N prefix - the same createPartial-enforced rule forwardTo()
@@ -141,7 +163,7 @@ public:
 // ===========================================================================
 
 template< typename MutexType, typename... Args >
-inline void BasicEvent< MutexType, Args... >::operator()( Args... args )
+inline void GenericEvent< MutexType, Args... >::operator()( Args... args )
 {
 	if ( this->_impl->isBlocked() )
 	{
@@ -163,8 +185,8 @@ inline void BasicEvent< MutexType, Args... >::operator()( Args... args )
 		// NOTE that the same strong reference requirement is needed for:
 		// - BasicEventImpl::dispatch
 		// - BasicConcurrentEventImpl::dispatch
-		// - BasicConcurrentEvent::operator()
-		// - BasicRecordableEvent::operator()
+		// - GenericConcurrentEvent::operator()
+		// - GenericRecordableEvent::operator()
 		auto self = this->_impl;
 		senderLoop->post(
 			EventLoop::Task::create(
@@ -183,13 +205,13 @@ inline void BasicEvent< MutexType, Args... >::operator()( Args... args )
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicEvent< MutexType, Args... >::trigger( Args... args )
+inline void GenericEvent< MutexType, Args... >::trigger( Args... args )
 {
 	operator()( std::forward< Args >( args )... );
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicEvent< MutexType, Args... >::emit( Args... args )
+inline void GenericEvent< MutexType, Args... >::emit( Args... args )
 {
 	operator()( std::forward< Args >( args )... );
 }
@@ -201,7 +223,7 @@ inline void BasicEvent< MutexType, Args... >::emit( Args... args )
 
 template< typename MutexType, typename... Args >
 template< typename SourceEvent >
-inline Connection BasicEvent< MutexType, Args... >::forwardFrom(
+inline Connection GenericEvent< MutexType, Args... >::forwardFrom(
 	SourceEvent& sourceEvent,
 	ConnectionType type,
 	typename SourceEvent::ConnParams params )
@@ -211,13 +233,42 @@ inline Connection BasicEvent< MutexType, Args... >::forwardFrom(
 
 template< typename MutexType, typename... Args >
 template< typename SourceEvent >
-inline Connection BasicEvent< MutexType, Args... >::forwardFrom(
+inline Connection GenericEvent< MutexType, Args... >::forwardFrom(
 	SourceEvent& sourceEvent,
 	typename SourceEvent::ConnParams params,
 	ConnectionType type )
 {
 	return forwardFrom( sourceEvent, type, std::move( params ) );
 }
+
+
+// ===========================================================================
+// BasicEvent - the resolving alias
+// ===========================================================================
+
+/**
+ * @brief BasicEvent<MutexType, Args...> - a resolving alias over
+ * GenericEvent.
+ *
+ * Resolves the function-style signature form (see event_signature.h)
+ * before naming GenericEvent, exactly the way RecursiveEvent/SharedEvent/
+ * SingleThreadedEvent resolve it before naming GenericEvent - so
+ * BasicEvent<M, void(Args...)> and BasicEvent<M, Args...> are always the
+ * exact same type:
+ *
+ * @code
+ * static_assert( std::is_same_v<
+ *     BasicEvent< CustomMutex, void( int, std::string ) >,
+ *     BasicEvent< CustomMutex, int, std::string > > );
+ * @endcode
+ *
+ * This is what makes a custom MutexType - any mutex the library's own
+ * Event/SharedEvent/SingleThreadedEvent aliases don't already cover - get
+ * the function-style spelling with the same identity guarantee those
+ * aliases give, rather than a derived-but-distinct type.
+ */
+template< typename MutexType, typename... Args >
+using BasicEvent = typename detail::ResolveEventArgs< GenericEvent, MutexType, Args... >::type;
 
 } // namespace stellyra
 } // namespace kmac

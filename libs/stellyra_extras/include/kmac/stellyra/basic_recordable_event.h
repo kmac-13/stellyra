@@ -6,29 +6,34 @@
  * @file basic_recordable_event.h
  * @brief Event with optional recording and statistics.
  *
- * BasicRecordableEvent<MutexType, Args...> presents the same public API as
- * BasicEvent<MutexType, Args...> but adds two opt-in capabilities:
+ * GenericRecordableEvent<MutexType, Args...> presents the same public API as
+ * GenericEvent<MutexType, Args...> but adds two opt-in capabilities:
  *
  *   - **Recording**: capture every emission (arguments + timestamp) for later
  *     replay or export; accessed through recorder()
  *   - **Statistics**: track emission count and cumulative emit time; accessed
  *     through getStatistics()
  *
- * Both are inactive by default.  BasicRecordableEvent always carries a larger
- * memory footprint than BasicEvent regardless of whether either feature is
- * in use.  For production code where size and the per-emission overhead
- * matter, use plain Event<Args...>.
+ * BasicRecordableEvent<MutexType, Args...> is a resolving alias over
+ * GenericRecordableEvent that additionally accepts the function-style
+ * signature form (see event_signature.h), mirroring GenericEvent/BasicEvent.
  *
- * Use BasicRecordableEvent during development, debugging, and testing.  The
- * compile-time swap between Event and RecordableEvent is transparent because
- * both expose identical connect / disconnect / operator() / trigger / emit
- * APIs via the shared EventStorage base:
+ * Both capabilities are inactive by default.  GenericRecordableEvent always
+ * carries a larger memory footprint than GenericEvent regardless of whether
+ * either feature is in use.  For production code where size and the
+ * per-emission overhead matter, use plain GenericEvent<Args...>.
+ *
+ * Use one of the *RecordableEvent variants during development, debugging, and
+ * testing.  The compile-time swap between (e.g.) RecursiveEvent and
+ * RecursiveRecordableEvent is transparent because both expose identical
+ * connect / disconnect / operator() / trigger / emit APIs via the shared
+ * EventStorage base:
  *
  * @code
  * class Sensor : public Trackable
  * {
  * public:
- *     RecordableEvent< float > reading { this };
+ *     RecursiveRecordableEvent< float > reading { this };
  *
  *     void measure( float value )
  *     {
@@ -47,6 +52,7 @@
  */
 
 #include <kmac/stellyra/basic_event_impl.h>
+#include <kmac/stellyra/event_signature.h>
 #include <kmac/stellyra/event_storage.h>
 
 #include "event_recorder.h"
@@ -61,7 +67,7 @@ namespace kmac {
 namespace stellyra {
 
 /**
- * @brief Statistics snapshot collected by BasicRecordableEvent.
+ * @brief Statistics snapshot collected by GenericRecordableEvent.
  */
 struct RecordingStatistics
 {
@@ -84,7 +90,7 @@ struct RecordingStatistics
  * @tparam Args argument types forwarded to connected handlers
  */
 template< typename MutexType, typename... Args >
-class BasicRecordableEvent : public EventStorage< kmac::stellyra::BasicEventImpl, MutexType, Args... >
+class GenericRecordableEvent : public EventStorage< kmac::stellyra::BasicEventImpl, MutexType, Args... >
 {
 	using Base = EventStorage< kmac::stellyra::BasicEventImpl, MutexType, Args... >;
 
@@ -100,7 +106,7 @@ public:
 	 *
 	 * Both statistics and recording are disabled by default.
 	 */
-	BasicRecordableEvent();
+	GenericRecordableEvent();
 
 	/**
 	 * @brief Construct with an owner Trackable.
@@ -109,14 +115,14 @@ public:
 	 *
 	 * @param owner the Trackable that owns this event (usually @c this)
 	 */
-	explicit BasicRecordableEvent( Trackable* owner );
+	explicit GenericRecordableEvent( Trackable* owner );
 
-	~BasicRecordableEvent() = default;
+	~GenericRecordableEvent() = default;
 
-	BasicRecordableEvent( const BasicRecordableEvent& ) = delete;
-	BasicRecordableEvent& operator=( const BasicRecordableEvent& ) = delete;
-	BasicRecordableEvent( BasicRecordableEvent&& ) = default;
-	BasicRecordableEvent& operator=( BasicRecordableEvent&& ) = default;
+	GenericRecordableEvent( const GenericRecordableEvent& ) = delete;
+	GenericRecordableEvent& operator=( const GenericRecordableEvent& ) = delete;
+	GenericRecordableEvent( GenericRecordableEvent&& ) = default;
+	GenericRecordableEvent& operator=( GenericRecordableEvent&& ) = default;
 
 	// =========================================================================
 	// triggering
@@ -206,7 +212,7 @@ public:
 //
 
 template< typename MutexType, typename... Args >
-inline BasicRecordableEvent< MutexType, Args... >::BasicRecordableEvent()
+inline GenericRecordableEvent< MutexType, Args... >::GenericRecordableEvent()
 {
 	// wire up replay so recorder().replay() fires back through this event
 	_recorder.setReplayTarget( Callable< void( Args... ) >::create( [ this ]( Args... args ) {
@@ -215,7 +221,7 @@ inline BasicRecordableEvent< MutexType, Args... >::BasicRecordableEvent()
 }
 
 template< typename MutexType, typename... Args >
-inline BasicRecordableEvent< MutexType, Args... >::BasicRecordableEvent( Trackable* owner )
+inline GenericRecordableEvent< MutexType, Args... >::GenericRecordableEvent( Trackable* owner )
 	: Base( owner )
 {
 	_recorder.setReplayTarget( Callable< void( Args... ) >::create( [ this ]( Args... args ) {
@@ -229,7 +235,7 @@ inline BasicRecordableEvent< MutexType, Args... >::BasicRecordableEvent( Trackab
 // ===========================================================================
 
 template< typename MutexType, typename... Args >
-inline void BasicRecordableEvent< MutexType, Args... >::operator()( Args... args )
+inline void GenericRecordableEvent< MutexType, Args... >::operator()( Args... args )
 {
 	if ( this->_impl->isBlocked() )
 	{
@@ -265,9 +271,9 @@ inline void BasicRecordableEvent< MutexType, Args... >::operator()( Args... args
 		// regardless of whether the event is still valid or not;
 		// NOTE that the same strong reference requirement is needed for:
 		// - BasicEventImpl::dispatch
-		// - BasicEvent::operator()
+		// - GenericEvent::operator()
 		// - BasicConcurrentEventImpl::dispatch
-		// - BasicConcurrentEvent::operator()
+		// - GenericConcurrentEvent::operator()
 		auto self = this->_impl;
 		senderLoop->post(
 			EventLoop::Task::create(
@@ -297,13 +303,13 @@ inline void BasicRecordableEvent< MutexType, Args... >::operator()( Args... args
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicRecordableEvent< MutexType, Args... >::trigger( Args... args )
+inline void GenericRecordableEvent< MutexType, Args... >::trigger( Args... args )
 {
 	operator()( std::forward< Args >( args )... );
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicRecordableEvent< MutexType, Args... >::emit( Args... args )
+inline void GenericRecordableEvent< MutexType, Args... >::emit( Args... args )
 {
 	operator()( std::forward< Args >( args )... );
 }
@@ -315,14 +321,14 @@ inline void BasicRecordableEvent< MutexType, Args... >::emit( Args... args )
 
 template< typename MutexType, typename... Args >
 inline EventRecorder< Args... >&
-BasicRecordableEvent< MutexType, Args... >::recorder()
+GenericRecordableEvent< MutexType, Args... >::recorder()
 {
 	return _recorder;
 }
 
 template< typename MutexType, typename... Args >
 inline const EventRecorder< Args... >&
-BasicRecordableEvent< MutexType, Args... >::recorder() const
+GenericRecordableEvent< MutexType, Args... >::recorder() const
 {
 	return _recorder;
 }
@@ -333,13 +339,13 @@ BasicRecordableEvent< MutexType, Args... >::recorder() const
 // ===========================================================================
 
 template< typename MutexType, typename... Args >
-inline bool BasicRecordableEvent< MutexType, Args... >::statisticsEnabled() const
+inline bool GenericRecordableEvent< MutexType, Args... >::statisticsEnabled() const
 {
 	return _statisticsEnabled.load( std::memory_order_relaxed );
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicRecordableEvent< MutexType, Args... >::enableStatistics( bool enable )
+inline void GenericRecordableEvent< MutexType, Args... >::enableStatistics( bool enable )
 {
 	_statisticsEnabled.store( enable, std::memory_order_relaxed );
 	if ( enable )
@@ -352,7 +358,7 @@ inline void BasicRecordableEvent< MutexType, Args... >::enableStatistics( bool e
 
 template< typename MutexType, typename... Args >
 inline RecordingStatistics
-BasicRecordableEvent< MutexType, Args... >::getStatistics() const
+GenericRecordableEvent< MutexType, Args... >::getStatistics() const
 {
 	RecordingStatistics stats;
 	stats.emissionCount = _emissionCount.load( std::memory_order_relaxed );
@@ -392,7 +398,7 @@ BasicRecordableEvent< MutexType, Args... >::getStatistics() const
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicRecordableEvent< MutexType, Args... >::resetStatistics()
+inline void GenericRecordableEvent< MutexType, Args... >::resetStatistics()
 {
 	_emissionCount.store( 0, std::memory_order_relaxed );
 	_totalEmitTimeNs.store( 0, std::memory_order_relaxed );
@@ -404,7 +410,7 @@ inline void BasicRecordableEvent< MutexType, Args... >::resetStatistics()
 // ===========================================================================
 
 template< typename MutexType, typename... Args >
-inline std::string BasicRecordableEvent< MutexType, Args... >::getSummary() const
+inline std::string GenericRecordableEvent< MutexType, Args... >::getSummary() const
 {
 	auto stats = getStatistics();  // also snapshots connection counts
 
@@ -464,6 +470,21 @@ inline std::string BasicRecordableEvent< MutexType, Args... >::getSummary() cons
 
 	return oss.str();
 }
+
+/**
+ * @brief BasicRecordableEvent<MutexType, Args...> - a resolving alias over
+ * GenericRecordableEvent.
+ *
+ * Resolves the function-style signature form (see event_signature.h)
+ * before naming GenericRecordableEvent, exactly the way BasicEvent resolves
+ * it before naming GenericEvent - so BasicRecordableEvent<M, void(Args...)>
+ * and BasicRecordableEvent<M, Args...> are always the exact same type.  For
+ * a plain Args... pack the two names are interchangeable; use
+ * BasicRecordableEvent when the function-style form is wanted,
+ * GenericRecordableEvent otherwise.
+ */
+template< typename MutexType, typename... Args >
+using BasicRecordableEvent = typename detail::ResolveEventArgs< GenericRecordableEvent, MutexType, Args... >::type;
 
 } // namespace stellyra
 } // namespace kmac

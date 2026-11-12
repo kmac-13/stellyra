@@ -17,9 +17,9 @@
  * inspector.dumpConnectionGraph( std::cout );
  * @endcode
  *
- * For PrivateEvent, an inspector is the only way to inspect from outside the
- * owning class (PrivateEvent's trigger methods are private, but inspection
- * remains public).
+ * For GenericPrivateEvent, an inspector is the only way to inspect from
+ * outside the owning class (GenericPrivateEvent's trigger methods are
+ * private, but inspection remains public).
  *
  * All methods acquire the event's internal mutex before reading, so they are
  * safe to call while other threads are emitting or connecting.
@@ -32,6 +32,7 @@
  */
 
 #include <kmac/stellyra/stellyra_fwd.h>
+#include <kmac/stellyra/basic_event.h>
 #include <kmac/stellyra/basic_event_impl.h>
 #include <kmac/stellyra/config.h>
 #include <kmac/stellyra/event_detail.h>
@@ -65,21 +66,40 @@ public:
 	/**
 	 * @brief Construct an inspector for `event`.
 	 *
+	 * Takes GenericEvent (the underlying class backing the BasicEvent/Event/
+	 * SharedEvent/SingleThreadedEvent aliases) rather than BasicEvent
+	 * itself: BasicEvent resolves through detail::ResolveEventArgs, which
+	 * class template argument deduction (CTAD) cannot invert to deduce
+	 * MutexType/Args... back out of an alias parameter - GenericEvent is the
+	 * directly-deducible name.  Any event declared through BasicEvent (or
+	 * Event, SharedEvent, ...) with a plain Args... pack already *is* an
+	 * GenericEvent<MutexType, Args...>, so this binds exactly the same calls
+	 * as before.
+	 *
 	 * @param event event to inspect; must outlive this inspector
 	 */
-	EventInspector( BasicEvent< MutexType, Args... >& event );
+	EventInspector( GenericEvent< MutexType, Args... >& event );
 
 	/**
 	 * @brief Construct an inspector for a private event.
 	 *
-	 * EventInspector is declared a friend of BasicPrivateEvent so this
+	 * Takes GenericPrivateEvent directly, for the same reason the primary
+	 * constructor above takes GenericEvent rather than BasicEvent: CTAD
+	 * cannot deduce MutexType/Args... back out of the BasicPrivateEvent
+	 * alias.  Any private event declared through BasicPrivateEvent (or
+	 * RecursivePrivateEvent/SharedPrivateEvent/SingleThreadedPrivateEvent)
+	 * with a plain Args... pack already *is* a
+	 * GenericPrivateEvent<FriendType, MutexType, Args...>, so this binds
+	 * exactly the same calls as before.
+	 *
+	 * EventInspector is declared a friend of GenericPrivateEvent so this
 	 * constructor can reach the EventStorage base without exposing trigger
 	 * methods through an Event*.
 	 *
 	 * @param event private event to inspect; must outlive this inspector
 	 */
 	template< typename FriendType >
-	EventInspector( BasicPrivateEvent< FriendType, MutexType, Args... >& event );
+	EventInspector( GenericPrivateEvent< FriendType, MutexType, Args... >& event );
 
 	// default copy/move - the raw pointer is cheap to copy
 	EventInspector( const EventInspector& ) = default;
@@ -146,7 +166,7 @@ public:
 	 * @code
 	 * [Sender: MyClass]
 	 *        |
-	 *    [Event: Event<int>]
+	 *    [Event: RecursiveEvent<int>]
 	 *        |
 	 *        +--[Direct]---> [method]
 	 *        |
@@ -184,14 +204,13 @@ private:
 	const platform::SharedPtr< Impl >& impl() const;
 };
 
-
 //
 // IMPLEMENTATION
 //
 
 template< typename MutexType, typename... Args >
 inline EventInspector< MutexType, Args... >::EventInspector(
-	BasicEvent< MutexType, Args... >& event )
+	GenericEvent< MutexType, Args... >& event )
 	: _storage( &event )
 {
 }
@@ -199,8 +218,8 @@ inline EventInspector< MutexType, Args... >::EventInspector(
 template< typename MutexType, typename... Args >
 template< typename FriendType >
 inline EventInspector< MutexType, Args... >::EventInspector(
-	BasicPrivateEvent< FriendType, MutexType, Args... >& event )
-	// static_cast is safe: BasicPrivateEvent inherits BasicEvent which inherits
+	GenericPrivateEvent< FriendType, MutexType, Args... >& event )
+	// static_cast is safe: GenericPrivateEvent inherits GenericEvent which inherits
 	// EventStorage; EventInspector is a friend with knowledge of this hierarchy
 	: _storage( static_cast< EventStorage< kmac::stellyra::BasicEventImpl, MutexType, Args... >* >( &event ) )
 {

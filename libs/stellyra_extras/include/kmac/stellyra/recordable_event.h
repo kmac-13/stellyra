@@ -6,29 +6,65 @@
  * @file recordable_event.h
  *
  * @brief Convenience wrapper for basic_recordable_event.h inclusion along
- * with common aliases for BasicRecordableEvent using specific mutex types.
+ * with common aliases for GenericRecordableEvent using specific mutex types.
  */
 
 #include "basic_recordable_event.h"
 
+#include <kmac/stellyra/event_signature.h>
+
 namespace kmac {
 namespace stellyra {
 
-/** @brief Default RecordableEvent uses RecursiveMutex, matching Event<Args...>. */
+/**
+ * @brief Recordable event using RecursiveMutex, matching
+ * RecursiveEvent<Args...>.
+ *
+ * Accepts either the plain argument pack
+ * (RecursiveRecordableEvent<int, std::string>) or the equivalent
+ * function-style signature (RecursiveRecordableEvent<void(int, std::string)>)
+ * (see event_signature.h).
+ */
 template< typename... Args >
-using RecordableEvent = BasicRecordableEvent< platform::RecursiveMutex, Args... >;
+using RecursiveRecordableEvent = typename detail::ResolveEventArgs< GenericRecordableEvent, platform::RecursiveMutex, Args... >::type;
 
-/** @brief SharedMutex variant matching SharedEvent<Args...>. */
+/**
+ * @brief Alias for users that prefer signal/emit terminology.
+ */
 template< typename... Args >
-using SharedRecordableEvent = BasicRecordableEvent< platform::SharedMutex, Args... >;
+using RecursiveRecordableSignal = RecursiveRecordableEvent< Args... >;
 
-/** @brief NullMutex variant matching SingleThreadedEvent<Args...>. */
+/**
+ * @brief Recordable event using SharedMutex, matching
+ * SharedEvent<Args...>.
+ *
+ * Accepts the function-style signature form too - see
+ * RecursiveRecordableEvent above.
+ */
 template< typename... Args >
-using SingleThreadedRecordableEvent = BasicRecordableEvent< platform::NullMutex, Args... >;
+using SharedRecordableEvent = typename detail::ResolveEventArgs< GenericRecordableEvent, platform::SharedMutex, Args... >::type;
 
-/** @brief Alias for users that prefer signal/emit terminology. */
+/**
+ * @brief Alias for users that prefer signal/emit terminology.
+ */
 template< typename... Args >
-using RecordableSignal = RecordableEvent< Args... >;
+using SharedRecordableSignal = SharedRecordableEvent< Args... >;
+
+/**
+ * @brief Recordable event using NullMutex, matching
+ * SingleThreadedEvent<Args...>.
+ *
+ * Accepts the function-style signature form too - see
+ * RecursiveRecordableEvent above.
+ */
+template< typename... Args >
+using SingleThreadedRecordableEvent = typename detail::ResolveEventArgs< GenericRecordableEvent, platform::NullMutex, Args... >::type;
+
+/**
+ * @brief Alias for users that prefer signal/emit terminology.
+ */
+template< typename... Args >
+using SingleThreadedRecordableSignal = SingleThreadedRecordableEvent< Args... >;
 
 } // namespace stellyra
 } // namespace kmac

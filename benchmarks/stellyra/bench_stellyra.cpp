@@ -48,16 +48,18 @@ using namespace bench;
 // Fixtures
 // ============================================================================
 
-/// Minimal sender: owns one Event<EventArg> (RecursiveMutex-backed - fully
-/// serialised dispatch, connect()/disconnect() safe from any thread).
+/// Minimal sender: owns one RecursiveEvent<EventArg> (RecursiveMutex-backed -
+/// fully serialised dispatch, connect()/disconnect() safe from any thread).
 struct Sender : stellyra::Trackable
 {
-	stellyra::Event< EventArg > fired { this };
+	stellyra::RecursiveEvent< EventArg > fired { this };
 };
 
 /// Same shape as Sender, but backed by ConcurrentEvent<EventArg> (regular
 /// Mutex guarding connect()/disconnect() only - dispatch itself is
 /// lock-free/epoch-based and does not serialise concurrent triggers the way
+///
+/// TODO: update these descriptions to indicate RecursiveEvent is the name and not a default!!!
 /// Event's RecursiveMutex does).  Added so every Stellyra-vs-Qt-vs-vdk
 /// concurrent scenario can show both of Stellyra's thread-safe event types
 /// side by side rather than only Event - see RUNNING.md / BENCHMARK_RESULTS.md
@@ -131,7 +133,7 @@ BENCHMARK( BM_Emit_1Connection_ConcurrentEvent );
 
 static void BM_Emit_1Connection_FreeNTTP( benchmark::State& state )
 {
-	stellyra::Event< EventArg > fired;
+	stellyra::RecursiveEvent< EventArg > fired;
 	fired.connectFree< &onFiredFree >( stellyra::ConnectionType::Direct );
 
 	for ( auto _ : state )
@@ -155,7 +157,7 @@ BENCHMARK( BM_Emit_1Connection_FreeNTTP_ConcurrentEvent );
 
 static void BM_Emit_1Connection_Free( benchmark::State& state )
 {
-	stellyra::Event< EventArg > fired;
+	stellyra::RecursiveEvent< EventArg > fired;
 	fired.connectFree( onFiredFree, stellyra::ConnectionType::Direct );
 
 	for ( auto _ : state )
@@ -183,7 +185,7 @@ BENCHMARK( BM_Emit_1Connection_Free_ConcurrentEvent );
 
 static void BM_Emit_1Connection_Lambda( benchmark::State& state )
 {
-	stellyra::Event< EventArg > fired;
+	stellyra::RecursiveEvent< EventArg > fired;
 	fired.connectLambda( []( EventArg v ) { global_sink.store( v, std::memory_order_relaxed ); } );
 
 	for ( auto _ : state )
@@ -416,7 +418,7 @@ BENCHMARK( BM_Emit_1Connection_Auto_CrossLoop );
 
 static void BM_ConnectDisconnect( benchmark::State& state )
 {
-	stellyra::Event< EventArg > fired;
+	stellyra::RecursiveEvent< EventArg > fired;
 
 	for ( auto _ : state )
 	{
@@ -1291,7 +1293,7 @@ static void BM_ConcurrentEmission_Direct_Serialized( benchmark::State& state )
 {
 	const int n = static_cast< int >( state.range( 0 ) );
 
-	stellyra::Event< EventArg > fired;
+	stellyra::RecursiveEvent< EventArg > fired;
 	std::vector< LocalSinkReceiver > receivers( n );
 
 	for ( auto& r : receivers )
@@ -1432,7 +1434,7 @@ static void BM_ConcurrentEmission_Direct_Parallel( benchmark::State& state )
 {
 	const int n = static_cast< int >( state.range( 0 ) );
 
-	stellyra::Event< EventArg > fired;
+	stellyra::RecursiveEvent< EventArg > fired;
 	std::vector< LocalSinkReceiver > receivers( n );
 
 	for ( auto& r : receivers )
@@ -1585,7 +1587,7 @@ static void BM_ContentionScaling_Direct( benchmark::State& state )
 {
 	const int threadCount = static_cast< int >( state.range( 0 ) );
 
-	stellyra::Event< EventArg > fired;
+	stellyra::RecursiveEvent< EventArg > fired;
 	std::vector< LocalSinkReceiver > receivers( CONTENTION_RECEIVER_COUNT );
 
 	for ( auto& r : receivers )

@@ -31,13 +31,19 @@ enum class RecordingMode
 };
 
 template< typename MutexType, typename... Args >
-class BasicEvent;  ///< see event.h
+class GenericEvent;  ///< see basic_event.h - the underlying class behind the BasicEvent alias
+///< NOTE: BasicEvent itself is an alias template (basic_event.h) and has no
+///< incomplete form - it cannot be forward-declared here; include
+///< basic_event.h wherever the name BasicEvent is needed.
 
 template< typename FriendType, typename MutexType, typename... Args >
-class BasicPrivateEvent;  ///< see private_event.h
+class GenericPrivateEvent;  ///< see private_event.h - the underlying class behind the BasicPrivateEvent alias
+///< NOTE: BasicPrivateEvent itself is an alias template (private_event.h) and
+///< has no incomplete form - it cannot be forward-declared here; include
+///< private_event.h wherever the name BasicPrivateEvent is needed.
 
 template< typename... Types >
-struct EventFriendTypeList;  ///< see private_event.h - opt-in multi-friend BasicPrivateEvent
+struct EventFriendTypeList;  ///< see private_event.h - opt-in multi-friend GenericPrivateEvent/BasicPrivateEvent
 
 // template< typename MutexType, typename... Args >
 // class EventImpl;

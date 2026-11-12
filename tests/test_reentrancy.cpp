@@ -45,7 +45,7 @@ template< typename EventT >
 class Reentrancy : public ::testing::Test {};
 
 using EventTypes = ::testing::Types<
-	stellyra::Event< int >,
+	stellyra::RecursiveEvent< int >,
 	stellyra::SingleThreadedEvent< int > >;
 TYPED_TEST_SUITE( Reentrancy, EventTypes );
 

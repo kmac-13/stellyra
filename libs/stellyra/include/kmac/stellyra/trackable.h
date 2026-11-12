@@ -48,8 +48,8 @@ class Trackable
 	template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
 	friend class EventStorage;
 
-	template< typename ReturnType, typename MutexType, typename... Args >
-	friend class CombiningEvent;
+	template< typename Combiner, typename ReturnType, typename... Args >
+	friend class GenericCombiningEvent;
 
 private:
 	/**

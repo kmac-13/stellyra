@@ -16,7 +16,7 @@
  *
  * Usage with CombiningEvent:
  * @code
- * CombiningEvent<bool, Combiners::LogicalAnd<>, std::string> validate{this};
+ * CombiningEvent<Combiners::LogicalAnd<>, bool, std::string> validate{this};
  * validate.connect(checker1, &Checker::check);
  * validate.connect(checker2, &Checker::check);
  * bool allOk = validate("input");   // true only if every handler returns true

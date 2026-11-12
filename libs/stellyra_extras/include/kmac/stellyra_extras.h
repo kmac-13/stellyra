@@ -17,13 +17,13 @@
  * Include <kmac/stellyra_extras.h> when you need any of the following:
  *
  * - **ScopedConnection** / **ConnectionGroup** - RAII connection lifetime management
- * - **CombiningEvent** - events that collect and aggregate handler return values
- * - **ConcurrentEvent** - lock-free-dispatch event for high-performance
+ * - **BasicCombiningEvent** - events that collect and aggregate handler return values
+ * - **BasicConcurrentEvent** - lock-free-dispatch event for high-performance
  *   concurrent connect/disconnect/trigger from multiple threads
  * - **EventInspector** - runtime connection graph inspection and Graphviz DOT export
- * - **RecordableEvent** - event emission recording, replay, and performance statistics
+ * - **BasicRecordableEvent** - event emission recording, replay, and performance statistics
  * - **FastRecursiveMutex** / **SpinRecursiveMutex** - optional mutex types for
- *   BasicEvent<MutexType, ...>, alongside the core library's Event/SharedEvent/
+ *   BasicEvent<MutexType, ...>, alongside the core library's RecursiveEvent/SharedEvent/
  *   SingleThreadedEvent
  *
  * @section components Component Headers
@@ -33,15 +33,24 @@
  * | scoped_connection.h  | ScopedConnection (RAII auto-disconnect)             |
  * | connection_guard.h   | ConnectionGuard (thread-safe Connection access)     |
  * | connection_group.h   | ConnectionGroup (multi-connection RAII)             |
- * | combining_event.h    | CombiningEvent<ReturnType, Combiner, Args...>       |
+ * | combining_event.h    | BasicCombiningEvent<Combiner, ReturnType, Args...> - |
+ * |                      | resolving alias over GenericCombiningEvent, also     |
+ * |                      | accepting the function-style form                    |
+ * |                      | BasicCombiningEvent<Combiner, ReturnType(Args...)>   |
+ * |                      | via its own ResolveCombiningEventArgs mechanism (not |
+ * |                      | shared with others due to return type requirement)   |
  * | combiners.h          | Built-in combiner functors (10+ provided)           |
- * | concurrent_event.h   | ConcurrentEvent<Args...>, SingleThreadedConcurrentEvent<Args...> - |
- * |                      | aliases over BasicConcurrentEvent (basic_concurrent_event.h)       |
- * | epoch_domain.h       | EpochDomain - lock-free reclamation backing ConcurrentEvent's      |
- * |                      | dispatch path; not included by this umbrella directly - pulled in  |
- * |                      | transitively via basic_concurrent_event_impl.h                     |
+ * | concurrent_event.h   | Mutex-based aliases over GenericConcurrentEvent     |
+ * |                      | (basic_concurrent_event.h; BasicConcurrentEvent is  |
+ * |                      | the function-style-aware alias over it)             |
+ * | epoch_domain.h       | EpochDomain - lock-free reclamation backing         |
+ * |                      | ConcurrentEvent's dispatch path; not included by    |
+ * |                      | this umbrella directly - pulled in transitively via |
+ * |                      | basic_concurrent_event_impl.h                       |
  * | event_inspector.h    | EventInspector<Args...>                             |
- * | recordable_event.h   | RecordableEvent<Args...>                            |
+ * | recordable_event.h   | Mutex-based aliases over GenericRecordableEvent     |
+ * |                      | (basic_recordable_event.h; BasicRecordableEvent is  |
+ * |                      | the function-style-aware alias over it)             |
  * | event_recorder.h     | EventRecorder<Args...>                              |
  * |                      | (included transitively via recordable_event.h)      |
  * | property.h           | Property<T>, ReadOnlyProperty<Owner, T>,            |

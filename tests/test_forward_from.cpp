@@ -228,7 +228,7 @@ namespace {
 class SecureWidget : public stellyra::Trackable
 {
 public:
-	stellyra::PEvent< SecureWidget, int > moved { this };
+	stellyra::RecursivePrivateEvent< SecureWidget, int > moved { this };
 
 	// only SecureWidget's own code may wire a source into moved - that is
 	// exactly what the trigger-level access restriction protects
@@ -243,7 +243,7 @@ public:
 TEST( ForwardFromPrivateEvent, WiresAndForwards )
 {
 	SecureWidget w;
-	stellyra::Event< int > source;
+	stellyra::RecursiveEvent< int > source;
 	int last = -1;
 	w.moved.connectLambda( w, [ & ]( int x ) { last = x; } );
 

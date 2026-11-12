@@ -50,8 +50,8 @@
 namespace kmac {
 namespace stellyra {
 
-// forward declaration so EventImpl can befriend BasicEvent
-template< typename MutexType, typename... Args > class BasicEvent;
+// forward declaration so EventImpl can befriend GenericEvent
+template< typename MutexType, typename... Args > class GenericEvent;
 
 /**
  * @brief Heap-allocated implementation object for BasicEvent.
@@ -262,7 +262,8 @@ struct BasicEventImpl : EventImplBase
 	/**
 	 * @brief Trigger the event: dispatch args to every active handler in
 	 * dispatch order (see `order`/priorityConnCount above), each according
-	 * to its own resolved connection type.  Called by BasicEvent::operator().
+	 * to its own resolved connection type.  Called by
+	 * GenericEvent::operator().
 	 *
 	 * Two lock strategies, chosen at compile time via HasLockShared_value:
 	 *   - SharedMutex (SharedEvent): takes a SharedLock, so concurrent
@@ -803,10 +804,10 @@ void BasicEventImpl< MutexType, Args... >::dispatch( Args... args )
 			// least until the posted task is drained regardless of whether
 			// the associated event is still valid or not;
 			// NOTE that the same strong reference requirement is needed for:
-			// - BasicEvent::operator()
+			// - GenericEvent::operator()
 			// - BasicConcurrentEventImpl::dispatch
-			// - BasicConcurrentEvent::operator()
-			// - BasicRecordableEvent::operator()
+			// - GenericConcurrentEvent::operator()
+			// - GenericRecordableEvent::operator()
 			auto self = weakSelf.lock();
 			const uint32_t idx = slot;
 			const uint32_t gen = handlers[ slot ].generation;

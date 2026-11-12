@@ -130,7 +130,7 @@ public:
 	// reactive event - declared after _value (see file comment re: order)
 	// -------------------------------------------------------------------------
 
-	Event< const T& > changed;
+	RecursiveEvent< const T& > changed;
 };
 
 
@@ -226,7 +226,7 @@ public:
 	operator const T&() const;
 	const T& get() const;
 
-	Event< const T& > changed;
+	RecursiveEvent< const T& > changed;
 
 private:
 	// -------------------------------------------------------------------------
@@ -351,7 +351,7 @@ public:
 	operator T();
 	T get();
 
-	Event< T > changed;
+	RecursiveEvent< T > changed;
 
 private:
 	// -------------------------------------------------------------------------
@@ -444,7 +444,7 @@ public:
 	operator T();
 	T get();
 
-	Event< T > changed;
+	RecursiveEvent< T > changed;
 
 private:
 	// -------------------------------------------------------------------------
@@ -524,7 +524,7 @@ public:
 	operator const T&() const;
 	const T& get() const;
 
-	Event< const T& > changed;
+	RecursiveEvent< const T& > changed;
 };
 
 

@@ -36,7 +36,8 @@ class Setup;  // forward - the second, decoupling friend
 class OwnerA : public stellyra::Trackable
 {
 public:
-	stellyra::PrivateEvent< stellyra::EventFriendTypeList< OwnerA, Setup >, int > valueChanged { this };
+	stellyra::RecursivePrivateEvent<
+		stellyra::EventFriendTypeList< OwnerA, Setup >, int > valueChanged { this };
 
 	void setValue( int x ) { valueChanged( x ); }
 };
@@ -44,7 +45,7 @@ public:
 class SourceB : public stellyra::Trackable
 {
 public:
-	stellyra::Event< int > produced { this };
+	stellyra::RecursiveEvent< int > produced { this };
 
 	void produce( int x ) { produced( x ); }
 };
@@ -80,7 +81,7 @@ TEST( PrivateEventMultiOwner, SingleFriendFormUnaffected )
 	class SecureButton : public stellyra::Trackable
 	{
 	public:
-		stellyra::PEvent< SecureButton, int, int > clicked { this };
+		stellyra::RecursivePrivateEvent< SecureButton, int, int > clicked { this };
 		void click( int x, int y ) { clicked( x, y ); }
 	};
 
