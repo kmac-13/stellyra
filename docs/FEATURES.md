@@ -21,7 +21,7 @@
 * **blocking and RAII block guard** - temporarily disable a single connection (`block()`/`unblock()`), or pause an entire event for a scope via the RAII `BlockGuard` wrapper
 * **connection grouping (`ConnectionGroup`)** - manage multiple connections as a single disconnect-together unit
 * **result aggregation (`CombiningEvent` + combiners)** - aggregate handler return values (`LogicalAnd`/`Or`, `Sum`, `Average`, `Product`, `Maximum`/`Minimum`, `First`/`Last`, `CountTrue`, etc.)
-* **restricted triggering (`PrivateEvent`/`PEvent`)** - restrict triggering to the owning/friend class while still allowing external connections
+* **restricted triggering (`RecursivePrivateEvent`)** - restrict triggering to the owning/friend class while still allowing external connections
 * **recording/playback (`RecordableEvent`)** - record emissions with timestamps; replay them at original, scaled, or immediate speed; timing statistics and CSV export
 * **introspection (`EventInspector`)** - read-only inspection of an event's live connections, for debugging
 * **event forwarding (`forwardTo`, `forwardFrom`)** - relay one event's emissions into another
@@ -34,7 +34,7 @@
 ### Event System
 **Type-safe events with automatic connection management**
 ```cpp
-stellyra::Event< int, std::string > dataReady { trackable };
+stellyra::RecursiveEvent< int, std::string > dataReady { trackable };
 ```
 Events notify multiple handlers when triggered.  Connections automatically clean up when objects are destroyed, preventing dangling pointers.
 
@@ -51,13 +51,13 @@ stellyra::SingleThreadedConcurrentEvent< int > sensorReadingST { this };  // sam
 ```cpp
 // option 1: inherit (simplest)
 class AppClass : public stellyra::Trackable {
-	stellyra::Event< int, std::string > dataReady { this };
+	stellyra::RecursiveEvent< int, std::string > dataReady { this };
 };
 
 // option 2: pair with a standalone Trackable/Anchor (non-invasive - no inheritance required)
 class AppClass {
 	stellyra::Anchor _lifetime;  // standalone tracker; pass Tracked{ *this, _lifetime } when connecting
-	stellyra::Event< int, std::string > dataReady { &_lifetime };
+	stellyra::RecursiveEvent< int, std::string > dataReady { &_lifetime };
 };
 ```
 Inheriting `stellyra::Trackable` is the simplest path and gives the cleanest connect syntax.  Pairing a non-inheriting receiver with a standalone `stellyra::Trackable` (alias `stellyra::Anchor`) via `Tracked<T>{ receiver, tracker }` is fully supported for classes that cannot - or should not - modify their inheritance hierarchy.  Both approaches provide the same automatic connection cleanup when the tracker is destroyed.
@@ -240,12 +240,12 @@ Collects return values from handlers and combines them with specified logic.
 
 ## Encapsulation
 
-### PrivateEvent (PEvent)
+### PrivateEvent
 **Restrict event triggering to friend class**
 ```cpp
 class Button : public stellyra::Trackable {
 public:
-	stellyra::PrivateEvent< Button, int > clicked { this };  // only instances of Button can trigger
+	stellyra::RecursivePrivateEvent< Button, int > clicked { this };  // only instances of Button can trigger
 };
 ```
 Compile-time access control.  External code can connect but not trigger.
@@ -268,7 +268,7 @@ A small family of reactive wrappers - `Property<T>` (readable and writable by an
 ### RecordableEvent
 **Event with built-in recording and statistics**
 ```cpp
-stellyra::RecordableEvent< int > event { this };
+stellyra::RecursiveRecordableEvent< int > event { this };
 ```
 Extended Event that can record emissions and provide performance statistics.  Use for debugging/testing; use base Event for production.
 

@@ -110,7 +110,7 @@ class TemperatureSensor : public stellyra::Trackable
 private:
 	float _last = 0.0f;
 public:
-	stellyra::RecordableEvent< float > temperatureChanged { this };
+	stellyra::RecursiveRecordableEvent< float > temperatureChanged { this };
 
 	void scan()
 	{

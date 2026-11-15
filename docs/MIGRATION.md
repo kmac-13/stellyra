@@ -47,14 +47,14 @@ signals:
 // Stellyra - with inheritance
 class CustomClass : public stellyra::Trackable {
 public:
-	stellyra::Event< int > customEvent{ this };
+	stellyra::RecursiveEvent< int > customEvent{ this };
 };
 
 // Stellyra - without inheritance (non-invasive)
 class CustomClass {
 	stellyra::Trackable _anchor;
 public:
-	stellyra::Event< int > customEvent{ &_anchor };
+	stellyra::RecursiveEvent< int > customEvent{ &_anchor };
 	CustomClass() {}
 };
 ```
@@ -101,7 +101,7 @@ Qt's `AutoConnection` compares the **emitting thread** against the receiver's th
 
 ### Changes needed
 
-- replace `boost::signals2::signal< void( Args... ) >` with `stellyra::Event< Args... >`
+- replace `boost::signals2::signal< void( Args... ) >` with `stellyra::RecursiveEvent< Args... >`
 - replace `signal.connect( slot )` with `event.connect( receiver, slot )`
 - receivers: either inherit `stellyra::Trackable` (simplest) or pair a non-inheriting receiver with a standalone `Trackable`/`Anchor` via `Tracked<T>` - equivalent to Boost's `track_foreign( shared_ptr )` pattern, but without requiring the receiver to be `shared_ptr`-managed
 - no `shared_ptr` wrapping required for receivers - ordinary C++ object lifetime management applies
@@ -116,7 +116,7 @@ sig.connect( &handler );
 sig( 42 );
 
 // Stellyra
-stellyra::Event< int > event{ this };
+stellyra::RecursiveEvent< int > event{ this };
 event.connect( receiver, &Receiver::handler );
 event( 42 );
 ```
@@ -162,7 +162,7 @@ group1.disconnectAll();  // disconnects conn - group2's copy now reports disconn
 
 ### Changes needed
 
-- replace `sigc::signal< void( Args... ) >` with `stellyra::Event< Args... >`
+- replace `sigc::signal< void( Args... ) >` with `stellyra::RecursiveEvent< Args... >`
 - replace `signal.connect( slot )` with `event.connect( receiver, slot )`
 - receivers: either inherit `stellyra::Trackable` (simplest) or pair a non-inheriting receiver with a standalone `Trackable`/`Anchor` via `Tracked<T>` - replaces the `sigc::trackable` base class or `shared_ptr<sigc::trackable>` member
 - no `shared_ptr` wrapping required for receivers - ordinary C++ object lifetime management applies
@@ -208,7 +208,7 @@ event.connect( receiver, [value]( int ) { slot( value ); } );   // pre-bind - la
 
 ### Changes needed
 
-- replace `Nano::Signal< void( Args... ) >` with `stellyra::Event< Args... >`
+- replace `Nano::Signal< void( Args... ) >` with `stellyra::RecursiveEvent< Args... >`
 - replace `Nano::Observer<Policy>` base class with `stellyra::Trackable` (or pair a non-inheriting receiver with a standalone `Trackable`/`Anchor` via `Tracked<T>` - nano has no equivalent non-invasive option)
 - replace `sig.fire(args)` with `event(args)` (or `event.trigger(args)` / `event.emit(args)`)
 - no `shared_ptr` wrapping required for receivers - ordinary C++ object lifetime management applies
@@ -230,7 +230,7 @@ conn.disconnect();
 
 ### Policy system
 
-nano's compile-time policy selection (`ST_Policy`, `TS_Policy`) has a per-event equivalent in Stellyra: use `stellyra::SingleThreadedEvent<Args...>` (backed by a zero-overhead `NullMutex`) in place of `stellyra::Event<Args...>` for a signal that never needs locking, chosen per instance rather than library-wide:
+nano's compile-time policy selection (`ST_Policy`, `TS_Policy`) has a per-event equivalent in Stellyra: use `stellyra::SingleThreadedEvent<Args...>` (backed by a zero-overhead `NullMutex`) in place of `stellyra::RecursiveEvent<Args...>` for a signal that never needs locking, chosen per instance rather than library-wide:
 
 ```cpp
 // Equivalent to nano's ST_Policy for one signal - removes mutex overhead for just this event
@@ -263,7 +263,7 @@ stellyra::SingleThreadedEvent< int > sig;
 
 ### Changes needed
 
-- replace `sigslot::signal< Args... >` with `stellyra::Event< Args... >`
+- replace `sigslot::signal< Args... >` with `stellyra::RecursiveEvent< Args... >`
 - replace `signal.connect( &Receiver::slot, receiver )` with `event.connect( receiver, &Receiver::slot )` - note the argument order flips: sigslot takes the member-function pointer first and the object pointer second for every `connect()`/`disconnect()` overload, Stellyra takes the receiver first
 - receivers: sigslot has two separate, unrelated non-invasive-ish tracking mechanisms, not one combined pattern - (1) inherit `sigslot::observer`/`sigslot::observer_st`, or (2) manage the receiver via `std::shared_ptr`/`std::weak_ptr` with no inheritance at all, which sigslot auto-detects through an ADL `to_weak()` customization point.  Stellyra's `stellyra::Trackable` base class maps to (1); its non-inheriting `Tracked<T>`/`Anchor` pattern is the closer match for (2)'s "no inheritance needed" property, but - unlike (2) - doesn't require the receiver to be `shared_ptr`-managed at all
 - `scoped_connection` maps directly to `ScopedConnection`
@@ -279,7 +279,7 @@ sig.disconnect( &Receiver::onValue, &receiver );  // disconnect one slot
 sig.disconnect( &receiver );                      // disconnect everything for this receiver
 
 // Stellyra - receiver first, member-function pointer second
-stellyra::Event< int > event{ this };
+stellyra::RecursiveEvent< int > event{ this };
 event.connect( receiver, &Receiver::onValue );
 event( 42 );
 event.disconnect( receiver, &Receiver::onValue );  // disconnect one slot
@@ -313,7 +313,7 @@ event.disconnect( receiver );                      // disconnect everything - on
 
 ### Changes needed
 
-- replace `vdk::signal< void( ArgTs... ) >` with `stellyra::Event< ArgTs... >`
+- replace `vdk::signal< void( ArgTs... ) >` with `stellyra::RecursiveEvent< ArgTs... >`
 - replace `vdk::context` with `stellyra::Trackable` as the base class; unlike `Trackable`, `vdk::context` has a protected constructor/destructor and cannot be instantiated on its own, not even as a composed member - `signal::connect()`'s free-callable overload is `static_assert`-enforced to require a type that inherits from `context` (`is_base_of_v<context, Ty>`), so the "separate context for a free callable/lambda" pattern always means a small user-defined class derived from `context`, never a bare `vdk::context` instance - Stellyra's non-inheriting `Tracked<T>`/`Anchor` pattern (a real stand-alone `Trackable` member, needing no derived wrapper class) has no equivalent in vdk-signals
 - no `shared_ptr` wrapping required for receivers - ordinary C++ object lifetime management applies
 - replace emission calls with `event(args)` (or `event.trigger(args)` / `event.emit(args)`)
@@ -334,7 +334,7 @@ SlotContext ctx;
 sig.connect( &ctx, [&receiver]( int val ) { receiver.onValue( val ); } );
 
 // Stellyra - receiver inherits stellyra::Trackable
-stellyra::Event< int > event{ this };
+stellyra::RecursiveEvent< int > event{ this };
 event.connect( receiver, &Receiver::onValue );
 event( 42 );  // or event.emit( 42 );
 
@@ -364,7 +364,7 @@ vdk-signals' `vdk::context` automatically binds an object to its *creating* thre
 
 - license changes from Apache 2.0 to BSD 3-Clause - both are permissive with no copyleft obligation, so this is a lateral move, not a functional change
 - automatic thread affinity - vdk-signals' `vdk::context` gives every object a home thread automatically, with zero setup; Stellyra's equivalent (`Deferred`/`Auto` connections routed to an explicitly-assigned `EventLoop`) requires creating and assigning that loop yourself
-- lock-free emission - vdk-signals' emission path is lock-free via atomics by default; Stellyra's `Event` uses a real mutex (`RecursiveMutex` by default) - `BasicConcurrentEvent` (lock-free, epoch-based reclamation) is the closer match if that matters for your use case
+- lock-free emission - vdk-signals' emission path is lock-free via atomics by default; Stellyra's `RecursiveEvent` uses a real mutex (`RecursiveMutex` by default) - `BasicConcurrentEvent` (lock-free, epoch-based reclamation) is the closer match if that matters for your use case
 
 ---
 
@@ -374,7 +374,7 @@ vdk-signals' `vdk::context` automatically binds an object to its *creating* thre
 
 ### Changes needed
 
-- replace `rocket::signal< R( Args... ), Collector, ThreadingPolicy >` with `stellyra::Event< Args... >`
+- replace `rocket::signal< R( Args... ), Collector, ThreadingPolicy >` with `stellyra::RecursiveEvent< Args... >`
 - replace `rocket::trackable` base class with `stellyra::Trackable` (or pair a non-inheriting receiver with a standalone `Trackable`/`Anchor` via `Tracked<T>` - rocket's receiver inheritance is optional already, but its non-invasive path is manual `scoped_connection` management, not automatic disconnect)
 - no `shared_ptr` wrapping required for receivers - ordinary C++ object lifetime management applies
 - replace emission calls with `event(args)` (or `event.trigger(args)` / `event.emit(args)`)
@@ -389,7 +389,7 @@ sig.connect( &receiver, &Receiver::onValue );
 sig( 42 );
 
 // Stellyra
-stellyra::Event< int > event{ this };
+stellyra::RecursiveEvent< int > event{ this };
 event.connect( receiver, &Receiver::onValue );
 event( 42 );
 ```
@@ -424,7 +424,7 @@ event( 42 );
 
 ### Changes needed
 
-- replace `nod::signal< void( Args... ) >` with `stellyra::Event< Args... >`
+- replace `nod::signal< void( Args... ) >` with `stellyra::RecursiveEvent< Args... >`
 - `nod::signal::connect()` takes a single callable matching the signal's exact signature (`std::function<R(A...)>`) - there's no overload taking a receiver object and a member-function pointer as a pair, so existing call sites already wrap member functions in `std::bind` or a lambda.  Migration replaces that wrapped callable with a direct `event.connect( receiver, &Receiver::method )` call, dropping the bind/lambda wrapper entirely
 - add receiver lifetime tracking - nod has no base class and no auto-disconnect mechanism at all; every connection must be manually disconnected or wrapped in nod's own `scoped_connection`. Inherit `stellyra::Trackable` (simplest) or pair a non-inheriting receiver with a standalone `Trackable`/`Anchor` via `Tracked<T>` to get automatic disconnect-on-destruction, something nod never provided
 - replace emission calls (nod is `operator()`-only) with `event(args)` (or `event.trigger(args)` / `event.emit(args)`)
@@ -441,7 +441,7 @@ sig.connect( std::bind( &Receiver::onValue, &receiver, std::placeholders::_1 ) )
 sig( 42 );
 
 // Stellyra - connects the receiver and member function directly, no bind/lambda needed
-stellyra::Event< int > event{ this };
+stellyra::RecursiveEvent< int > event{ this };
 event.connect( receiver, &Receiver::onValue );
 event( 42 );
 ```

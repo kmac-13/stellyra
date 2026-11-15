@@ -54,7 +54,7 @@ The library uses a few different naming conventions for the same two roles. Stel
 ## In code
 
 ```cpp
-stellyra::Event<int> onReading;
+stellyra::RecursiveEvent<int> onReading;
 stellyra::Signal<int> onReadingAlias;  // Signal is an alias for Event
 
 onReading.connect(handler, Handler::method);

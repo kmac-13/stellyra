@@ -44,7 +44,7 @@ namespace stellyra = kmac::stellyra;
 class Button : public stellyra::Trackable
 {
 public:
-	stellyra::Event< int, int > clicked{ this };
+	stellyra::RecursiveEvent< int, int > clicked{ this };
 
 	void click( int x, int y ) { clicked( x, y ); }
 };
@@ -81,7 +81,7 @@ class NetworkManager  // no inheritance required
 {
 	stellyra::Trackable _obj;
 public:
-	stellyra::Event< int > dataReceived { &_obj };
+	stellyra::RecursiveEvent< int > dataReceived { &_obj };
 
 	void receive( int value ) { dataReceived( value ); }
 };
@@ -136,6 +136,7 @@ public:
 - **Per-instance thread-safety strategy** - choose the mutex strategy per event via a type alias: `Event` (recursive mutex), `SharedEvent` (shared mutex, concurrent dispatch), or `SingleThreadedEvent` (zero-overhead no-op mutex)
 - **Pluggable mutex type** - those three aliases cover the common cases, but `BasicEvent<MutexType, Args...>` accepts any type satisfying the standard `Lockable`/`SharedLockable` requirements, so a custom mutex can be supplied directly - `stellyra_extras/mutex_types.h`'s experimental `FastRecursiveMutex`/`SpinRecursiveMutex` are exactly this, provided for benchmarking a given toolchain against `std::recursive_mutex`
 - **Three trigger syntaxes** - `event(args)`, `event.trigger(args)`, `event.emit(args)` - all equivalent
+- **Function-style signatures** - `RecursiveEvent<void(int, std::string)>` is an alternative, equivalent variation of `RecursiveEvent<int, std::string>` (likewise for `SharedEvent`/`SingleThreadedEvent`), and applies across all event families, including `*ConcurrentEvent`, `*RecordableEvent`, `*PrivateEvent`, and `*CombiningEvent` (with `CombiningEvent` the only one supporting non-void return type); parameter names in the function type (e.g. `RecursiveEvent<void(int employeeId, std::string newTitle)>`) are accepted too, purely as documentation; `BasicEvent<MutexType, void(Args...)>` works directly, too, for custom `MutexType`'s that the library's aliases don't cover
 - **Automatic lifetime management** - connections disconnect automatically when sender or receiver is destroyed; no dangling calls
 - **Partial argument matching** - a member function handler can omit trailing arguments it doesn't need; trailing args are silently dropped at compile time with no runtime cost
 
@@ -166,15 +167,15 @@ public:
 - **ScopedConnection** - RAII wrapper that disconnects when it goes out of scope
 
 ### Encapsulation
-- **PrivateEvent** - `PrivateEvent<Owner, Args...>` (`PEvent<Owner, Args...>` alias) allows external `connect()` but restricts triggering to the owner class; enforced at compile time via the type system. `PrivateEvent<EventFriendTypeList<Types...>, Args...>` is the opt-in multi-friend form, for when more than one class legitimately needs trigger access (e.g. a decoupling class wiring two otherwise-unrelated owners' events together via `forwardFrom()`)
+- **Private Event** - `RecursivePrivateEvent<Owner, Args...>` allows external `connect()` but restricts triggering to the owner class (enforced at compile time via the type system); `RecursivePrivateEvent<EventFriendTypeList<Types...>, Args...>` is the opt-in multi-friend form, for when more than one class legitimately needs trigger access (e.g. a decoupling class wiring two otherwise-unrelated owners' events together via `forwardFrom()`)
 
 ### Extended Features (`stellyra_extras.h`)
-- **ConnectionGroup** - manages a set of connections across multiple events as a unit
-- **ConcurrentEvent** - a lock-free, `EpochDomain`-backed alternative to `Event`/`SharedEvent`, letting multiple threads trigger genuinely in parallel with no shared or exclusive lock in the dispatch path at all
-- **CombiningEvent** - collects return values from all handlers and combines them with a configurable combiner
+- **Connection Group** - manages a set of connections across multiple events as a unit
+- **Concurrent Event** - a lock-free, `EpochDomain`-backed alternative to `RecursiveEvent`/`SharedEvent`, letting multiple threads trigger genuinely in parallel with no shared or exclusive lock in the dispatch path at all
+- **Combining Event** - collects return values from all handlers and combines them with a configurable combiner
 - **10+ built-in combiners** - `LogicalAnd`, `LogicalOr`, `Sum`, `Product`, `Mean` (`Average`), `Maximum`, `Minimum`, `CountTrue`, `First`, `FirstNonDefault`, `Last`, `LastNonDefault`
-- **EventInspector** - runtime inspection of connection metadata, ASCII connection graph, and Graphviz DOT export (`toDotString()`)
-- **RecordableEvent** - records emissions with timestamps; replay at original, adjusted, or variable speed; export to CSV; performance statistics
+- **Event Inspector** - runtime inspection of connection metadata, ASCII connection graph, and Graphviz DOT export (`toDotString()`)
+- **Recordable Event** - records emissions with timestamps; replay at original, adjusted, or variable speed; export to CSV; performance statistics
 - **Properties** - `Property<T>` (read/write by anyone), `ReadOnlyProperty<Owner, T>` (read externally, write only by Owner), `ComputedProperty<Owner, T>` / `ComputedPropertyFn<Owner, T>` (derived from a member function or lambda), and `ConstProperty<T>`  (immutable) - all expose the same read surface (implicit conversion, get(), a changed event) so calling code doesn’t need to know which variant it’s holding
 
 ---
