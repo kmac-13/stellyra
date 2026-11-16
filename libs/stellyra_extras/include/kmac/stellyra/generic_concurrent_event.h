@@ -1,9 +1,9 @@
 #pragma once
-#ifndef KMAC_STELLYRA_BASIC_CONCURRENT_EVENT_H
-#define KMAC_STELLYRA_BASIC_CONCURRENT_EVENT_H
+#ifndef KMAC_STELLYRA_GENERIC_CONCURRENT_EVENT_H
+#define KMAC_STELLYRA_GENERIC_CONCURRENT_EVENT_H
 
 /**
- * @file basic_concurrent_event.h
+ * @file generic_concurrent_event.h
  * @brief GenericConcurrentEvent<MutexType, Args...> - the triggerable, primary
  * event type, backed by BasicConcurrentEventImpl through the generalised
  * EventStorage, and BasicConcurrentEvent<MutexType, Args...> - a resolving
@@ -159,21 +159,7 @@ inline void GenericConcurrentEvent< MutexType, Args... >::emit( Args... args )
 	operator()( std::forward< Args >( args )... );
 }
 
-/**
- * @brief BasicConcurrentEvent<MutexType, Args...> - a resolving alias over
- * GenericConcurrentEvent.
- *
- * Resolves the function-style signature form (see event_signature.h)
- * before naming GenericConcurrentEvent, exactly the way BasicEvent resolves
- * it before naming GenericEvent - so BasicConcurrentEvent<M, void(Args...)>
- * and BasicConcurrentEvent<M, Args...> are always the exact same type.  For
- * a plain Args... pack, the two names are interchangeable; use
- * BasicConcurrentEvent when the function-style form is required.
- */
-template< typename MutexType, typename... Args >
-using BasicConcurrentEvent = typename detail::ResolveEventArgs< GenericConcurrentEvent, MutexType, Args... >::type;
-
 } // namespace stellyra
 } // namespace kmac
 
-#endif // KMAC_STELLYRA_BASIC_CONCURRENT_EVENT_H
+#endif // KMAC_STELLYRA_GENERIC_CONCURRENT_EVENT_H

@@ -1,9 +1,9 @@
 #pragma once
-#ifndef KMAC_STELLYRA_BASIC_EVENT_H
-#define KMAC_STELLYRA_BASIC_EVENT_H
+#ifndef KMAC_STELLYRA_GENERIC_EVENT_H
+#define KMAC_STELLYRA_GENERIC_EVENT_H
 
 /**
- * @file event.h
+ * @file generic_event.h
  * @brief GenericEvent<MutexType, Args...> - the triggerable event type, and
  * BasicEvent<MutexType, Args...> - a resolving alias over it.
  *
@@ -25,14 +25,13 @@
  * GenericEvent itself is discouraged for ordinary use.
  *
  * Public API is focused here.  Implementation details live in:
- *   event_storage.h : EventStorage<MutexType, Args...> - connect/disconnect/block
- *   event_flags.h   : EventFlags                       - bit-field flag wrapper
- *   event_impl.h    : EventImpl<MutexType, Args...>    - dispatch, mutex, handlers
- *   handler_entry.h : HandlerEntry<Args...>            - per-connection slot
+ *   event_storage.h    : EventStorage<MutexType, Args...>   - connect/disconnect/block
+ *   event_flags.h      : EventFlags                         - bit-field flag wrapper
+ *   basic_event_impl.h : BasicEventImpl<MutexType, Args...> - dispatch, mutex, handlers
+ *   handler_entry.h    : HandlerEntry<Args...>              - per-connection slot
  */
 
 #include "basic_event_impl.h"
-#include "event_signature.h"
 #include "event_storage.h"
 
 #include <memory>
@@ -241,36 +240,7 @@ inline Connection GenericEvent< MutexType, Args... >::forwardFrom(
 	return forwardFrom( sourceEvent, type, std::move( params ) );
 }
 
-
-// ===========================================================================
-// BasicEvent - the resolving alias
-// ===========================================================================
-
-/**
- * @brief BasicEvent<MutexType, Args...> - a resolving alias over
- * GenericEvent.
- *
- * Resolves the function-style signature form (see event_signature.h)
- * before naming GenericEvent, exactly the way RecursiveEvent/SharedEvent/
- * SingleThreadedEvent resolve it before naming GenericEvent - so
- * BasicEvent<M, void(Args...)> and BasicEvent<M, Args...> are always the
- * exact same type:
- *
- * @code
- * static_assert( std::is_same_v<
- *     BasicEvent< CustomMutex, void( int, std::string ) >,
- *     BasicEvent< CustomMutex, int, std::string > > );
- * @endcode
- *
- * This is what makes a custom MutexType - any mutex the library's own
- * Event/SharedEvent/SingleThreadedEvent aliases don't already cover - get
- * the function-style spelling with the same identity guarantee those
- * aliases give, rather than a derived-but-distinct type.
- */
-template< typename MutexType, typename... Args >
-using BasicEvent = typename detail::ResolveEventArgs< GenericEvent, MutexType, Args... >::type;
-
 } // namespace stellyra
 } // namespace kmac
 
-#endif // KMAC_STELLYRA_BASIC_EVENT_H
+#endif // KMAC_STELLYRA_GENERIC_EVENT_H

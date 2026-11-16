@@ -1,9 +1,9 @@
 #pragma once
-#ifndef KMAC_STELLYRA_PRIVATE_EVENT_H
-#define KMAC_STELLYRA_PRIVATE_EVENT_H
+#ifndef KMAC_STELLYRA_GENERIC_PRIVATE_EVENT_H
+#define KMAC_STELLYRA_GENERIC_PRIVATE_EVENT_H
 
 /**
- * @file private_event.h
+ * @file generic_private_event.h
  * @brief PrivateEvent - Event with compile-time restricted triggering.
  *
  * GenericPrivateEvent<FriendType, Args...> inherits privately from
@@ -64,7 +64,7 @@
  *   enforced."
  */
 
-#include "event.h"
+#include "generic_event.h"
 
 namespace kmac {
 namespace stellyra {
@@ -309,85 +309,7 @@ public:
 	~GenericPrivateEvent() = default;
 };
 
-/**
- * @brief BasicPrivateEvent<FriendType, MutexType, Args...> - a resolving
- * alias over GenericPrivateEvent.
- *
- * Resolves the function-style signature form (see event_signature.h)
- * before naming GenericPrivateEvent, exactly the way BasicEvent resolves it
- * before naming GenericEvent - so BasicPrivateEvent<F, M, void(Args...)> and
- * BasicPrivateEvent<F, M, Args...> are always the exact same type.  For a
- * plain Args... pack the two names are interchangeable; use BasicPrivateEvent
- * when the function-style form is wanted, otherwise either option works.
- * `FriendType` may be a single class, or EventFriendTypeList<A, B, ...> for
- * the multi-friend form - unaffected by this alias layer either way.
- */
-template< typename FriendType, typename MutexType, typename... Args >
-using BasicPrivateEvent = typename detail::ResolvePrivateEventArgs< GenericPrivateEvent, FriendType, MutexType, Args... >::type;
-
-// ============================================================================
-// Convenience aliases
-// ============================================================================
-
-/**
- * @brief Private event using the RecursiveMutex strategy.
- *
- * `FriendType` may be a single class, or EventFriendTypeList<A, B, ...> for
- * the multi-friend form.
- *
- * Accepts either the plain argument pack
- * (RecursivePrivateEvent<MyClass, int>) or the equivalent function-style
- * signature (RecursivePrivateEvent<MyClass, void(int)>) - see
- * event_signature.h.
- *
- * @code
- * RecursivePrivateEvent< MyClass, int > valueChanged { this };
- * RecursivePrivateEvent< EventFriendTypeList< MyClass, Setup >, int > valueChanged2 { this };
- * @endcode
- */
-template< typename FriendType, typename... Args >
-using RecursivePrivateEvent = typename detail::ResolvePrivateEventArgs< GenericPrivateEvent, FriendType, platform::RecursiveMutex, Args... >::type;
-
-/**
- * @brief Signal-terminology alias for RecursivePrivateEvent.
- */
-template< typename FriendType, typename... Args >
-using RecursivePrivateSignal = RecursivePrivateEvent< FriendType, Args... >;
-
-/**
- * @brief Private event using SharedMutex (concurrent reads, exclusive writes).
- *
- * Use when the event will be triggered from many threads simultaneously and
- * all connected handlers are Direct.
- *
- * Accepts the function-style signature form too - see RecursivePrivateEvent
- * above.
- */
-template< typename FriendType, typename... Args >
-using SharedPrivateEvent = typename detail::ResolvePrivateEventArgs< GenericPrivateEvent, FriendType, platform::SharedMutex, Args... >::type;
-
-/**
- * @brief Signal-terminology alias for SharedPrivateEvent.
- */
-template< typename FriendType, typename... Args >
-using SharedPrivateSignal = SharedPrivateEvent< FriendType, Args... >;
-
-/**
- * @brief Private event using NullMutex (zero overhead, single-threaded only).
- *
- * Accepts the function-style signature form too - see RecursivePrivateEvent
- * above.
- */
-template< typename FriendType, typename... Args >
-using SingleThreadedPrivateEvent = typename detail::ResolvePrivateEventArgs< GenericPrivateEvent, FriendType, platform::NullMutex, Args... >::type;
-
-/**
- * @brief Signal-terminology alias for SingleThreadedPrivateEvent.
- */
-template< typename FriendType, typename... Args >
-using SingleThreadedPrivateSignal = SingleThreadedPrivateEvent< FriendType, Args... >;
-
 } // namespace stellyra
 } // namespace kmac
 
-#endif // KMAC_STELLYRA_PRIVATE_EVENT_H
+#endif // KMAC_STELLYRA_GENERIC_PRIVATE_EVENT_H

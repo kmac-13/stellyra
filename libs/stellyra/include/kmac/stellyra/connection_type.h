@@ -55,7 +55,8 @@ enum class ResolvedConnectionType : uint8_t
 };
 
 /**
- * @brief Specify the context for when a predicate is evaluated (default is Receiver).
+ * @brief Specify the context for when a predicate is evaluated (default is
+ * Receiver).
  *
  * For Direct connections both contexts behave identically: the predicate
  * is always evaluated synchronously inside trigger() since sender and
@@ -63,12 +64,13 @@ enum class ResolvedConnectionType : uint8_t
  * Deferred connections:
  *
  *   Receiver - The task is always posted, the predicate is evaluated inside
- *              invokeDeferred() on the receiver's EventLoop drain, immediately
- *              before the handler is called.  A false result prevents the
- *              handler from being executed during the drain.  This is the
- *              natural default because the handler is what actually does the
- *              work when an event fires, so the decision belongs with it:
- *              filter events based on receiver state at the time of handling.
+ *              invokeDeferred() on the receiver's EventLoop drain,
+ *              immediately before the handler is called.  A false result
+ *              prevents the handler from being executed during the drain.
+ *              This is the natural default because the handler is what
+ *              actually does the work when an event fires, so the decision
+ *              belongs with it: filter events based on receiver state at the
+ *              time of handling.
  *
  *   Sender   - Evaluated in trigger() before the task is posted.  A false
  *              result suppresses the post entirely; the EventLoop never

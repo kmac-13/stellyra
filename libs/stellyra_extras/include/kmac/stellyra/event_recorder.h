@@ -134,7 +134,8 @@ public:
 	// =========================================================================
 
 	/**
-	 * @brief Returns true if recording is currently active (not paused or stopped).
+	 * @brief Returns true if recording is currently active (not paused or
+	 * stopped).
 	 */
 	bool isRecording() const;
 
@@ -174,8 +175,8 @@ public:
 	/**
 	 * @brief Stop recording.
 	 *
-	 * Existing recordings are retained and can still be replayed or exported.
-	 * Call clearRecordings() to discard them.
+	 * Existing recordings are retained and can still be replayed or
+	 * exported.  Call clearRecordings() to discard them.
 	 */
 	void stopRecording();
 

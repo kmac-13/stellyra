@@ -80,7 +80,8 @@ public:
 	ConnectionGuard( ConnectionGuard&& other ) noexcept;
 
 	/**
-	 * @brief Move assignment, replaces the wrapped Connection with `other`'s.
+	 * @brief Move assignment, replaces the wrapped Connection with
+	 * `other`'s.
 	 *
 	 * This does NOT disconnect the connection currently wrapped by this
 	 * guard - it simply stops being reachable through this guard and keeps

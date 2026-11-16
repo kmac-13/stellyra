@@ -234,8 +234,9 @@ struct BasicEventImpl : EventImplBase
 
 	/**
 	 * @brief Place a new connection in a slot: initialise it in place, wire
-	 * flags, predicate and counts, and bring it into dispatch order (or, when
-	 * a dispatch is in progress, defer ordering to reconcileAfterTrigger).
+	 * flags, predicate and counts, and bring it into dispatch order (or,
+	 * when a dispatch is in progress, defer ordering to
+	 * reconcileAfterTrigger).
 	 *
 	 * @param handler the callable to invoke on dispatch
 	 * @param tag the receiver's migration tag (Trackable::migrationTag()), or
@@ -244,7 +245,8 @@ struct BasicEventImpl : EventImplBase
 	 * @param declaredType the ConnectionType set at connect() time
 	 * @param resolved declaredType already resolved against current loop topology
 	 * @param receiverLoop the tracked receiver's EventLoop, or nullptr
-	 * @param hasOwner true if bound to a receiver/owner object rather than a free function or lambda (see EventFlags::hasOwner())
+	 * @param hasOwner true if bound to a receiver/owner object rather than a free
+	 *   function or lambda (see EventFlags::hasOwner())
 	 * @param isSingleShot true if this connection should auto-disconnect after firing once
 	 * @param hasPredicate true if `predicate` is non-empty and should be attached
 	 * @param predicate the conditional predicate, moved in; ignored if hasPredicate is false

@@ -1,5 +1,8 @@
 #include "test_helpers.h"
 
+#include <kmac/stellyra/recordable_signal_types.h>
+#include <kmac/stellyra/private_signal_types.h>
+#include <kmac/stellyra/signal_types.h>
 #include <kmac/stellyra_extras.h>
 
 #include <mutex>
@@ -29,12 +32,12 @@
 // GenericConcurrentEvent, GenericRecordableEvent, GenericPrivateEvent
 // respectively).  See the "direct usage" sections below.
 //
-// CombiningEvent (combining_event.h) gets the same function-style
+// BasicCombiningEvent (combining_event_types.h) gets the same function-style
 // convenience through a separate mechanism (ResolveCombiningEventArgs,
 // confined to that header) - rather than requiring R to be void and
 // discarding it the way every family above does, it captures R and forwards
-// it as CombiningEvent's own ReturnType, since that return value is
-// meaningful there.  See the "CombiningEvent direct usage" section below.
+// it as BasicCombiningEvent's own ReturnType, since that return value is
+// meaningful there.  See the "BasicCombiningEvent direct usage" section below.
 // ---------------------------------------------------------------------------
 
 namespace {
@@ -91,8 +94,8 @@ static_assert( std::is_same_v<
 // ---------------------------------------------------------------------------
 
 static_assert( std::is_same_v<
-		stellyra::ConcurrentEvent< int, std::string >,
-		stellyra::ConcurrentEvent< void( int, std::string ) >
+		stellyra::StandardConcurrentEvent< int, std::string >,
+		stellyra::StandardConcurrentEvent< void( int, std::string ) >
 	> );
 
 static_assert( std::is_same_v<
@@ -178,7 +181,7 @@ TEST( EventSignature, FunctionStyleConcurrentEventConnectsAndDispatches )
 	Owner owner;
 	Receiver receiver;
 
-	stellyra::ConcurrentEvent< void( int, std::string ) > valueChanged { &owner };
+	stellyra::StandardConcurrentEvent< void( int, std::string ) > valueChanged { &owner };
 	valueChanged.connect( receiver, &Receiver::onValue );
 
 	valueChanged( 7, "world" );
@@ -450,14 +453,14 @@ TEST( EventSignature, EventInspectorCtadSeesThroughFunctionStyleBasicPrivateEven
 }
 
 // ---------------------------------------------------------------------------
-// CombiningEvent direct usage - a separate resolving mechanism
-// (ResolveCombiningEventArgs, confined to combining_event.h) from the
-// ResolveEventArgs/ResolvePrivateEventArgs families above: CombiningEvent's
+// BasicCombiningEvent direct usage - a separate resolving mechanism
+// (ResolveCombiningEventArgs, confined to combining_event_types.h) from the
+// ResolveEventArgs/ResolvePrivateEventArgs families above: BasicCombiningEvent's
 // return type is meaningful (the per-handler value its Combiner reduces),
 // so unlike every alias above, the function-style form here is NOT
 // restricted to void - the resolver captures and forwards R rather than
-// asserting it away.  CombiningEvent<Combiner, R(Args...)> and
-// CombiningEvent<Combiner, R, Args...> must still be the exact same type.
+// asserting it away.  BasicCombiningEvent<Combiner, R(Args...)> and
+// BasicCombiningEvent<Combiner, R, Args...> must still be the exact same type.
 // ---------------------------------------------------------------------------
 
 static_assert( std::is_same_v<

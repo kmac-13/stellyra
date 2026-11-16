@@ -23,7 +23,7 @@
 
 #include "../common/benchmark_helpers.h"
 
-#include <kmac/stellyra/event.h>
+#include <kmac/stellyra/event_types.h>
 
 #include <benchmark/benchmark.h>
 

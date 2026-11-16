@@ -180,7 +180,8 @@ public:
 	bool isConnected() const;
 
 	/**
-	 * @brief Releases ownership without disconnecting - the connection stays alive.
+	 * @brief Releases ownership without disconnecting - the connection stays
+	 * alive.
 	 */
 	void release();
 };

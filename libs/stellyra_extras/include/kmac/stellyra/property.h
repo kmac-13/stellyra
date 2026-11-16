@@ -32,8 +32,8 @@
  *
  *   // Lambda - wrap in Callable, pass Trackable& as explicit tracker:
  *   prop.changed.connect(
- *       Callable< void( const float& ) >::create( [ this ]( const float& v ) { ... } ),
- *       *this );
+ *       Callable< void( const float& ) >::create(
+ *           [ this ]( const float& v ) { ... } ), *this );
  *
  * Note on const: Callable::operator() is non-const in the new Stellyra API.
  * ComputedProperty/ComputedPropertyFn therefore make get() and operator T()
@@ -41,7 +41,7 @@
  */
 
 #include <kmac/stellyra/callable.h>
-#include <kmac/stellyra/event.h>
+#include <kmac/stellyra/event_types.h>
 #include <kmac/stellyra/trackable.h>
 
 #include <type_traits>

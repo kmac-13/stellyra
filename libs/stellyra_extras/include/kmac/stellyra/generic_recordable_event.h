@@ -1,9 +1,9 @@
 #pragma once
-#ifndef KMAC_STELLYRA_BASIC_RECORDABLE_EVENT_H
-#define KMAC_STELLYRA_BASIC_RECORDABLE_EVENT_H
+#ifndef KMAC_STELLYRA_GENERIC_RECORDABLE_EVENT_H
+#define KMAC_STELLYRA_GENERIC_RECORDABLE_EVENT_H
 
 /**
- * @file basic_recordable_event.h
+ * @file generic_recordable_event.h
  * @brief Event with optional recording and statistics.
  *
  * GenericRecordableEvent<MutexType, Args...> presents the same public API as
@@ -129,7 +129,8 @@ public:
 	// =========================================================================
 
 	/**
-	 * @brief Trigger the event - record emission, update statistics, then dispatch.
+	 * @brief Trigger the event - record emission, update statistics, then
+	 * dispatch.
 	 *
 	 * Recording and statistics are only active when explicitly enabled;
 	 * the overhead when both are off is a single atomic bool load per
@@ -471,22 +472,7 @@ inline std::string GenericRecordableEvent< MutexType, Args... >::getSummary() co
 	return oss.str();
 }
 
-/**
- * @brief BasicRecordableEvent<MutexType, Args...> - a resolving alias over
- * GenericRecordableEvent.
- *
- * Resolves the function-style signature form (see event_signature.h)
- * before naming GenericRecordableEvent, exactly the way BasicEvent resolves
- * it before naming GenericEvent - so BasicRecordableEvent<M, void(Args...)>
- * and BasicRecordableEvent<M, Args...> are always the exact same type.  For
- * a plain Args... pack the two names are interchangeable; use
- * BasicRecordableEvent when the function-style form is wanted,
- * GenericRecordableEvent otherwise.
- */
-template< typename MutexType, typename... Args >
-using BasicRecordableEvent = typename detail::ResolveEventArgs< GenericRecordableEvent, MutexType, Args... >::type;
-
 } // namespace stellyra
 } // namespace kmac
 
-#endif // KMAC_STELLYRA_BASIC_RECORDABLE_EVENT_H
+#endif // KMAC_STELLYRA_GENERIC_RECORDABLE_EVENT_H

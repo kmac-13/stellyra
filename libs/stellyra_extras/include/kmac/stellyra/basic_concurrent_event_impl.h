@@ -4,8 +4,9 @@
 
 /**
  * @file basic_concurrent_event_impl.h
- * @brief BasicConcurrentEventImpl<MutexType, Args...> - the primary, EventStorage-
- * compatible lock-free-dispatch implementation behind GenericConcurrentEvent.
+ * @brief BasicConcurrentEventImpl<MutexType, Args...> - the primary,
+ * EventStorage-compatible lock-free-dispatch implementation behind
+ * GenericConcurrentEvent.
  *
  * Each slot is a std::atomic<Entry*>, reclaimed through EpochDomain rather
  * than protected by a lock, extended with everything EventStorage's
@@ -13,8 +14,9 @@
  * an ImplT:
  *
  *   - MutexType mutex, Trackable* owner, WeakPtr<EventImplBase> weakSelf
- *   - addConnection(...) with the exact signature EventImpl<MutexType,Args...>
- *     uses, so EventStorage::connectImpl() cannot tell the two apart
+ *   - addConnection(...) with the exact signature
+ *     EventImpl<MutexType,Args...> uses, so EventStorage::connectImpl()
+ *     cannot tell the two apart
  *   - findFirstMatch(...) for by-target disconnect<Method>/disconnectFree/
  *     disconnect(receiver, method)
  *   - preLockDisconnectAll() for disconnectAll()
@@ -252,9 +254,9 @@ public:
 	 *
 	 * @note `hasOwner` is accepted for interface parity but not yet stored
 	 * anywhere: it only matters for BasicEvent-style introspection
-	 * (EventInspector), which does not yet support BasicConcurrentEvent - a real gap,
-	 * not lost information (nothing reads it, nothing depends on it being
-	 * right, yet).
+	 * (EventInspector), which does not yet support BasicConcurrentEvent - a
+	 * real gap, not lost information (nothing reads it, nothing depends on
+	 * it being right, yet).
 	 */
 	uint32_t addConnection(
 		HandlerType&& handler, uint64_t tag, uint16_t priority,
@@ -282,8 +284,8 @@ public:
 	void dispatch( Args... args );
 
 	/**
-	 * @brief Disconnect all active handlers. Caller must already hold `mutex`
-	 * - same contract as EventImpl::preLockDisconnectAll().
+	 * @brief Disconnect all active handlers. Caller must already hold
+	 * `mutex` - same contract as EventImpl::preLockDisconnectAll().
 	 */
 	void preLockDisconnectAll();
 
@@ -370,7 +372,8 @@ private:
 	static SlotArray* allocateSlotArray( size_t capacity );
 
 	/**
-	 * @brief Called under `mutex`. Doubles the slot array, publishes it, retires the old one.
+	 * @brief Called under `mutex`. Doubles the slot array, publishes it,
+	 * retires the old one.
 	 */
 	SlotArray* growSlots();
 
@@ -382,7 +385,8 @@ private:
 	void rebuildOrderLocked();
 
 	/**
-	 * @brief Called under `mutex`. Publishes `snap` (possibly null) and retires whatever was published before.
+	 * @brief Called under `mutex`. Publishes `snap` (possibly null) and
+	 * retires whatever was published before.
 	 */
 	void publishOrder( OrderSnapshot* snap );
 

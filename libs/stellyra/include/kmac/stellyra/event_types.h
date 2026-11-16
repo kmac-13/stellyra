@@ -1,26 +1,51 @@
 #pragma once
-#ifndef KMAC_STELLYRA_EVENT_H
-#define KMAC_STELLYRA_EVENT_H
+#ifndef KMAC_STELLYRA_EVENT_TYPES_H
+#define KMAC_STELLYRA_EVENT_TYPES_H
 
 /**
- * @file event.h
- * @brief RecursiveEvent / SharedEvent / SingleThreadedEvent - the triggerable
- * event aliases, fixed to a particular MutexType.
+ * @file event_types.h
+ * @brief Convenient aliases over GenericEvent that support function-style
+ * syntax with some specifying mutex types.
  *
- * Each is a thin alias over GenericEvent (see basic_event.h) that resolves
- * the function-style signature form (event_signature.h) before naming it,
- * the same guarantee BasicEvent gives for a custom MutexType.
+ * BasicEvent is a thin alias over GenericEvent (see generic_event.h) that
+ * supports the same template arguments and signature as GenericEvent but adds
+ * a function-style signature form (see event_signature.h) before resolving
+ * to GenericEvent.  The other aliases - RecursiveEvent, SharedEvent, and
+ * SingleThreadedEvent - all resolve to GenericEvent with specific mutex types
+ * (see platform.h) while also supporting the function-style syntax option.
  */
 
-#include "basic_event.h"
 #include "event_signature.h"
+#include "generic_event.h"
 #include "platform.h"
 
 namespace kmac {
 namespace stellyra {
 
 /**
- * @brief Thread-safe event using a recursive mutex - the default choice.
+ * @brief BasicEvent<MutexType, Args...> - a resolving alias over
+ * GenericEvent.
+ *
+ * Resolves the function-style signature form (see event_signature.h) before
+ * naming GenericEvent - so BasicEvent<M, void(Args...)> and
+ * BasicEvent<M, Args...> are always the exact same type:
+ *
+ * @code
+ * static_assert( std::is_same_v<
+ *     BasicEvent< CustomMutex, void( int, std::string ) >,
+ *     BasicEvent< CustomMutex, int, std::string > > );
+ * @endcode
+ *
+ * This is what makes a custom MutexType - any mutex the library's own
+ * Event/SharedEvent/SingleThreadedEvent aliases don't already cover - get
+ * the function-style spelling with the same identity guarantee those
+ * aliases give, rather than a derived-but-distinct type.
+ */
+template< typename MutexType, typename... Args >
+using BasicEvent = typename detail::ResolveEventArgs< GenericEvent, MutexType, Args... >::type;
+
+/**
+ * @brief Thread-safe event using a recursive mutex.
  * connect()/disconnect()/trigger() may be called from any thread, and a
  * handler may safely reentrantly connect, disconnect, or trigger on this
  * same event while it fires.  See SharedEvent for concurrent-reader
@@ -62,4 +87,4 @@ using SingleThreadedEvent = typename detail::ResolveEventArgs< GenericEvent, pla
 } // namespace stellyra
 } // namespace kmac
 
-#endif // KMAC_STELLYRA_EVENT_H
+#endif // KMAC_STELLYRA_EVENT_TYPES_H

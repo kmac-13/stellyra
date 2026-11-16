@@ -33,8 +33,8 @@
 
 #include "../common/benchmark_helpers.h"
 
-#include <kmac/stellyra/event.h>
-#include <kmac/stellyra/concurrent_event.h>
+#include <kmac/stellyra/event_types.h>
+#include <kmac/stellyra/concurrent_event_types.h>
 
 #include <benchmark/benchmark.h>
 
@@ -69,7 +69,7 @@ struct Sender : stellyra::Trackable
 /// "_ConcurrentEvent"-suffixed counterpart wherever both are measured.
 struct ConcurrentSender : stellyra::Trackable
 {
-	stellyra::ConcurrentEvent< EventArg > fired { this };
+	stellyra::StandardConcurrentEvent< EventArg > fired { this };
 };
 
 /// Minimal receiver: writes received value to global_sink.
@@ -145,7 +145,7 @@ BENCHMARK( BM_Emit_1Connection_FreeNTTP );
 
 static void BM_Emit_1Connection_FreeNTTP_ConcurrentEvent( benchmark::State& state )
 {
-	stellyra::ConcurrentEvent< EventArg > fired;
+	stellyra::StandardConcurrentEvent< EventArg > fired;
 	fired.connectFree< &onFiredFree >( stellyra::ConnectionType::Direct );
 
 	for ( auto _ : state )
@@ -169,7 +169,7 @@ BENCHMARK( BM_Emit_1Connection_Free );
 
 static void BM_Emit_1Connection_Free_ConcurrentEvent( benchmark::State& state )
 {
-	stellyra::ConcurrentEvent< EventArg > fired;
+	stellyra::StandardConcurrentEvent< EventArg > fired;
 	fired.connectFree( onFiredFree, stellyra::ConnectionType::Direct );
 
 	for ( auto _ : state )
@@ -199,7 +199,7 @@ BENCHMARK( BM_Emit_1Connection_Lambda );
 // workload, only the event type differs.
 static void BM_Emit_1Connection_Lambda_ConcurrentEvent( benchmark::State& state )
 {
-	stellyra::ConcurrentEvent< EventArg > fired;
+	stellyra::StandardConcurrentEvent< EventArg > fired;
 	fired.connectLambda( []( EventArg v ) { global_sink.store( v, std::memory_order_relaxed ); } );
 
 	for ( auto _ : state )
@@ -452,7 +452,7 @@ BENCHMARK( BM_ConnectDisconnect );
 // snapshot rebuild on every connect()/disconnect() - not lock contention.
 static void BM_ConnectDisconnect_ConcurrentEvent( benchmark::State& state )
 {
-	stellyra::ConcurrentEvent< EventArg > fired;
+	stellyra::StandardConcurrentEvent< EventArg > fired;
 
 	for ( auto _ : state )
 	{
@@ -1362,7 +1362,7 @@ static void BM_ConcurrentEmission_Direct_Serialized_ConcurrentEvent( benchmark::
 {
 	const int n = static_cast< int >( state.range( 0 ) );
 
-	stellyra::ConcurrentEvent< EventArg > fired;
+	stellyra::StandardConcurrentEvent< EventArg > fired;
 	std::vector< LocalSinkReceiver > receivers( n );
 
 	for ( auto& r : receivers )
@@ -1503,7 +1503,7 @@ static void BM_ConcurrentEmission_Direct_Parallel_ConcurrentEvent( benchmark::St
 {
 	const int n = static_cast< int >( state.range( 0 ) );
 
-	stellyra::ConcurrentEvent< EventArg > fired;
+	stellyra::StandardConcurrentEvent< EventArg > fired;
 	std::vector< LocalSinkReceiver > receivers( n );
 
 	for ( auto& r : receivers )
@@ -1658,7 +1658,7 @@ static void BM_ContentionScaling_Direct_ConcurrentEvent( benchmark::State& state
 {
 	const int threadCount = static_cast< int >( state.range( 0 ) );
 
-	stellyra::ConcurrentEvent< EventArg > fired;
+	stellyra::StandardConcurrentEvent< EventArg > fired;
 	std::vector< LocalSinkReceiver > receivers( CONTENTION_RECEIVER_COUNT );
 
 	for ( auto& r : receivers )

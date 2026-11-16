@@ -32,11 +32,11 @@
  */
 
 #include <kmac/stellyra/stellyra_fwd.h>
-#include <kmac/stellyra/basic_event.h>
 #include <kmac/stellyra/basic_event_impl.h>
 #include <kmac/stellyra/config.h>
 #include <kmac/stellyra/event_detail.h>
 #include <kmac/stellyra/event_storage.h>
+#include <kmac/stellyra/generic_event.h>
 #include <kmac/stellyra/inspection_info.h>
 
 #include <sstream>

@@ -144,8 +144,8 @@ private:
 	struct FuncTraits;
 
 	/**
-	 * @brief Forwards the first sizeof...(HandlerArgs) of Args... to *obj.*Method,
-	 * dropping the rest.  HandlerArgs/ClassType come from
+	 * @brief Forwards the first sizeof...(HandlerArgs) of Args... to
+	 * *obj.*Method, dropping the rest.  HandlerArgs/ClassType come from
 	 * MethodTraits<decltype(Method)>.
 	 */
 	template< auto Method >
@@ -161,8 +161,8 @@ private:
 	static ReturnType partialFunctionStub( void* obj, Args... args );
 
 	/**
-	 * @brief Index-sequence helper for partialMethodStub: unpacks argTuple's first
-	 * sizeof...(I) elements as the call to *obj.*Method.  argTuple is
+	 * @brief Index-sequence helper for partialMethodStub: unpacks argTuple's
+	 * first sizeof...(I) elements as the call to *obj.*Method.  argTuple is
 	 * std::tuple<Args&&...> as produced by std::forward_as_tuple - a tuple
 	 * of references into partialMethodStub's parameter pack, not a tuple of
 	 * values.

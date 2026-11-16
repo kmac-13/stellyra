@@ -82,11 +82,22 @@
  * | handler_entry.h      | HandlerEntry<Args...> - per-connection storage slot            |
  * | event_detail.h       | Shared detail helpers (arity traits, PmfInvoker, connection-type resolution) |
  * | event_impl_base.h    | EventImplBase - type-erased base shared by Connection/EventLoop |
- * | event_impl.h         | EventImpl<MutexType,Args...> - dispatch, mutex, handler storage |
+ * | basic_event_impl.h   | BasicEventImpl<MutexType,Args...> - dispatch, mutex, handler storage |
  * | event_storage.h      | EventStorage<MutexType,Args...> - connect/disconnect/block API  |
- * | event.h              | RecursiveEvent<Args...>, SharedEvent<Args...>,                  |
- * |                      | SingleThreadedEvent<Args...>                                  |
- * | private_event.h      | PrivateEvent<FriendType,Args...>                              |
+ * | generic_event.h      | GenericEvent<MutexType,Args...> - the triggerable event type    |
+ * | event_types.h        | BasicEvent<MutexType,Args...>, RecursiveEvent<Args...>,         |
+ * |                      | SharedEvent<Args...>, SingleThreadedEvent<Args...>              |
+ * | signal_types.h       | BasicSignal<MutexType,Args...>, RecursiveSignal<Args...>,       |
+ * |                      | SharedSignal<Args...>, SingleThreadedSignal<Args...> - Signal   |
+ * |                      | aliases over the same types, for signal/emit terminology;       |
+ * |                      | not included by this umbrella - include it directly if needed  |
+ * | generic_private_event.h | GenericPrivateEvent<FriendType,MutexType,Args...> - the      |
+ * |                         | friend-restricted-trigger event type                          |
+ * | private_event_types.h | BasicPrivateEvent<MutexType,Args...>, RecursivePrivateEvent<Args...>, |
+ * |                       | SharedPrivateEvent<Args...>, SingleThreadedPrivateEvent<Args...>      |
+ * | private_signal_types.h | BasicPrivateSignal<MutexType,Args...>, RecursivePrivateSignal<Args...>, |
+ * |                        | SharedPrivateSignal<Args...>, SingleThreadedPrivateSignal<Args...> -   |
+ * |                        | not included by this umbrella - include it directly if needed         |
  * | event_loop.h         | EventLoop - manually-drained task queue for Deferred dispatch |
  * | auto_drain_thread.h  | AutoDrainThread - dedicated background thread that drains     |
  * |                      | an EventLoop; not included by this umbrella (pulls in         |
@@ -109,7 +120,7 @@
 #include "stellyra/trackable.h"
 
 // event implementations
-#include "stellyra/event.h"
-#include "stellyra/private_event.h"
+#include "stellyra/event_types.h"
+#include "stellyra/private_event_types.h"
 
 #endif // KMAC_STELLYRA_H

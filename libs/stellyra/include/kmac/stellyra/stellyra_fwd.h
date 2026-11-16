@@ -3,12 +3,13 @@
 
 /**
  * @file stellyra_fwd.h
- * @brief Forward declarations for all Stellyra library classes, enums, and aliases.
+ * @brief Forward declarations for all Stellyra library classes, enums, and
+ * aliases.
  *
- * Include this header when you only need type names (e.g. in other library headers)
- * and want to avoid pulling in full definitions.  Full definitions are provided by
- * the individual component headers and the top-level <kmac/stellyra.h> and
- * <kmac/stellyra_extras.h>.
+ * Include this header when you only need type names (e.g. in other library
+ * headers) and want to avoid pulling in full definitions.  Full definitions
+ * are provided by the individual component headers and the top-level
+ * <kmac/stellyra.h> and <kmac/stellyra_extras.h>.
  */
 
 namespace kmac {
