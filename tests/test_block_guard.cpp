@@ -41,7 +41,7 @@ template< typename EventT >
 class BlockGuardAcrossMutexTypes : public ::testing::Test {};
 
 using EventTypes = ::testing::Types<
-	stellyra::Event< int >,
+	stellyra::RecursiveEvent< int >,
 	stellyra::SharedEvent< int >,
 	stellyra::SingleThreadedEvent< int > >;
 TYPED_TEST_SUITE( BlockGuardAcrossMutexTypes, EventTypes );

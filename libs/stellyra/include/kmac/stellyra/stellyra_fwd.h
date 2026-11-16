@@ -3,12 +3,13 @@
 
 /**
  * @file stellyra_fwd.h
- * @brief Forward declarations for all Stellyra library classes, enums, and aliases.
+ * @brief Forward declarations for all Stellyra library classes, enums, and
+ * aliases.
  *
- * Include this header when you only need type names (e.g. in other library headers)
- * and want to avoid pulling in full definitions.  Full definitions are provided by
- * the individual component headers and the top-level <kmac/stellyra.h> and
- * <kmac/stellyra_extras.h>.
+ * Include this header when you only need type names (e.g. in other library
+ * headers) and want to avoid pulling in full definitions.  Full definitions
+ * are provided by the individual component headers and the top-level
+ * <kmac/stellyra.h> and <kmac/stellyra_extras.h>.
  */
 
 namespace kmac {
@@ -31,13 +32,19 @@ enum class RecordingMode
 };
 
 template< typename MutexType, typename... Args >
-class BasicEvent;  ///< see event.h
+class GenericEvent;  ///< see basic_event.h - the underlying class behind the BasicEvent alias
+///< NOTE: BasicEvent itself is an alias template (basic_event.h) and has no
+///< incomplete form - it cannot be forward-declared here; include
+///< basic_event.h wherever the name BasicEvent is needed.
 
 template< typename FriendType, typename MutexType, typename... Args >
-class BasicPrivateEvent;  ///< see private_event.h
+class GenericPrivateEvent;  ///< see private_event.h - the underlying class behind the BasicPrivateEvent alias
+///< NOTE: BasicPrivateEvent itself is an alias template (private_event.h) and
+///< has no incomplete form - it cannot be forward-declared here; include
+///< private_event.h wherever the name BasicPrivateEvent is needed.
 
 template< typename... Types >
-struct EventFriendTypeList;  ///< see private_event.h - opt-in multi-friend BasicPrivateEvent
+struct EventFriendTypeList;  ///< see private_event.h - opt-in multi-friend GenericPrivateEvent/BasicPrivateEvent
 
 // template< typename MutexType, typename... Args >
 // class EventImpl;

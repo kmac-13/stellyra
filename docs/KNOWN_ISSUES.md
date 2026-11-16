@@ -56,9 +56,9 @@ These are findings about the benchmark suite's toolchain and runtime environment
 
 ### 4. `std::shared_mutex` maps to a slow `pthread_rwlock_t` translation layer on MinGW
 
-**TL;DR:** `SharedEvent` is 6-9x slower than `Event` under contention on MinGW, due to a slow `std::shared_mutex` translation layer on that toolchain - not a bug, but a practical reason to avoid `SharedEvent` for contended workloads there.
+**TL;DR:** `SharedEvent` is 6-9x slower than `RecursiveEvent` under contention on MinGW, due to a slow `std::shared_mutex` translation layer on that toolchain - not a bug, but a practical reason to avoid `SharedEvent` for contended workloads there.
 
-**Finding, still true today, not a bug to fix:** `SharedEvent` (backed by `std::shared_mutex`) is 6–9x slower than `Event` (backed by `std::recursive_mutex`) for concurrent parallel dispatch on MinGW GCC 13.1.0, with a *super-linear* contention-scaling curve - roughly 5–7x slower at every thread-count doubling.
+**Finding, still true today, not a bug to fix:** `SharedEvent` (backed by `std::shared_mutex`) is 6–9x slower than `RecursiveEvent` (backed by `std::recursive_mutex`) for concurrent parallel dispatch on MinGW GCC 13.1.0, with a *super-linear* contention-scaling curve - roughly 5–7x slower at every thread-count doubling.
 
 **Root cause:** `std::shared_mutex` → `pthread_rwlock_t` → winpthreads' SRWLOCK translation layer on this toolchain.  Reader-writer lock implementations are independently well known to degrade badly under many simultaneous readers; this appears to be a severe case of that on MinGW specifically, not present to the same degree on Linux/glibc.
 
@@ -136,10 +136,10 @@ These are current, intentional constraints of the design - not bugs - worth know
   **Mitigation**: give the receiver an explicit destructor whose first statement is `disconnectAll()`.  This works because that call and any in-flight `invokeDeferred()`/dispatch share the same per-event mutex - calling it first blocks the destroying thread until any call already in flight completes, and prevents a new one from starting, before any of the receiver's own teardown proceeds.  It does not protect a destructor that does other work before that call, and there is no compiler enforcement that every `Trackable`-derived class remembers to add it.
   **Not an issue for**: the sender/dispatcher side - deferred-dispatch takes a shared_ptr to ensure liveness of the posted task regardless of whether the sender/dispatcher is still alive.  This limitation is specifically about the receiver.
 - **`SharedEvent` does not support reentrant trigger/connect/disconnect.**
-  `Event`'s default recursive mutex allows a handler to legitimately connect, disconnect, or re-trigger the same event from within its own invocation; `SharedEvent`'s shared mutex does not support this, and doing it anyway can deadlock.
+  `RecursiveEvent`'s default recursive mutex allows a handler to legitimately connect, disconnect, or re-trigger the same event from within its own invocation; `SharedEvent`'s shared mutex does not support this, and doing it anyway can deadlock.
 - **Single-shot connections (`ConnParams::once()`) are unavailable on `SharedEvent`.**
   Enforced by a `static_assert` at the call site: a single-shot handler disconnecting itself while a shared lock is held would deadlock for the same reason as above.
-- **`CombiningEvent` is Direct-only and non-reentrant.**
+- **`BasicCombiningEvent` is Direct-only and non-reentrant.**
   There is no Deferred variant (the combined return value must be available synchronously), and its internal mutex is a plain, non-recursive mutex - connecting, disconnecting, or re-triggering from inside a connected handler will deadlock.
 - **Predicates require exact-arity matching.**
   Unlike handlers (which support partial-argument matching via `createPartial`), a predicate passed to `ConnParams`/`.when()` must accept the event's full `Args...` list; there is no partial-predicate path, NTTP or otherwise.
@@ -154,7 +154,7 @@ These are current, intentional constraints of the design - not bugs - worth know
 - **`EventInspector` cannot report a connected receiver's address or concrete type**
   Only whether a connection is a "method" or "function/lambda" connection (`EventFlags::hasOwner()`) - `Callable` does not expose its bound object pointer generically.  Per-connection receiver identity would need a dedicated metadata field added to `HandlerEntry`.
 - **`BasicRecordableEvent` always carries a larger memory footprint than `BasicEvent`**
-  Whether or not recording or statistics are actually enabled - intended for development/debugging/testing, not as a drop-in replacement for `Event` in production code where per-event size matters.
+  Whether or not recording or statistics are actually enabled - intended for development/debugging/testing, not as a drop-in replacement for `RecursiveEvent` in production code where per-event size matters.
 - **`platform::Atomic<T>` in single-threaded/bare-metal mode (`STELLYRA_THREAD_SAFE=0`) is `volatile`-based, not lock-free-atomic**
   It is only safe on single-core targets (the only reordering concern there is compiler reordering, e.g. an ISR vs. the main loop).  A multi-core bare-metal or RTOS target needs a custom `platform::Atomic<T>` supplied via `STELLYRA_CUSTOM_ATOMIC` (examples for ARM Cortex-M LDREX/STREX and FreeRTOS critical sections are documented at the bottom of `platform.h`).
 - **`STELLYRA_ENABLE_THREAD` is a wired-up CMake option with no effect in the library itself.**
@@ -164,10 +164,10 @@ These are current, intentional constraints of the design - not bugs - worth know
 
 ## Library structure notes
 
-### `CombiningEvent` and other extras live in `stellyra_extras`, not the core library
+### `BasicCombiningEvent` and other extras live in `stellyra_extras`, not the core library
 
-`CombiningEvent` (return-value collection/combining across handlers), `EventRecorder`/`BasicRecordableEvent`, `ConnectionGroup`, and the optional mutex types all live in `libs/stellyra_extras/`, not `libs/stellyra/`.  **Lesson for future documentation or comparison work on this project:** "does Stellyra have X" needs checking against `stellyra_extras` as well as the core library - several real features live there by design, not as an oversight, and a check that only looks in `libs/stellyra/` will report a false negative.
+`BasicCombiningEvent` (return-value collection/combining across handlers), `EventRecorder`/`BasicRecordableEvent`, `ConnectionGroup`, and the optional mutex types all live in `libs/stellyra_extras/`, not `libs/stellyra/`.  **Lesson for future documentation or comparison work on this project:** "does Stellyra have X" needs checking against `stellyra_extras` as well as the core library - several real features live there by design, not as an oversight, and a check that only looks in `libs/stellyra/` will report a false negative.
 
 ### `stellyra_extras/mutex_types.h` - `FastRecursiveMutex` and `SpinRecursiveMutex`
 
-Both are experimental, atomic-owner-plus-depth-counter reentrant mutex types, not used by any shipped `Event` alias - provided so a given toolchain/target can be benchmarked against `std::recursive_mutex`.  `SpinRecursiveMutex`spins (bounded pure-spin, then yields) instead of falling back to a blocking `std::mutex`.  Both are verified under a single-threaded reentrancy test and a multi-thread/high-emission-count stress test (clean under ThreadSanitizer, Linux/libstdc++); neither has had long-duration soak testing or testing on Windows/MinGW at time of writing.
+Both are experimental, atomic-owner-plus-depth-counter reentrant mutex types, not used by any shipped event alias - provided so a given toolchain/target can be benchmarked against `std::recursive_mutex`.  `SpinRecursiveMutex`spins (bounded pure-spin, then yields) instead of falling back to a blocking `std::mutex`.  Both are verified under a single-threaded reentrancy test and a multi-thread/high-emission-count stress test (clean under ThreadSanitizer, Linux/libstdc++); neither has had long-duration soak testing or testing on Windows/MinGW at time of writing.

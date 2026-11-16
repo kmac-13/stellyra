@@ -120,6 +120,7 @@ add_stellyra_test( test_trackconnection_race   test_trackconnection_race.cpp )
 add_stellyra_test( test_forward_to             test_forward_to.cpp )
 add_stellyra_test( test_forward_from           test_forward_from.cpp )
 add_stellyra_test( test_private_event_multi_owner test_private_event_multi_owner.cpp )
+add_stellyra_test( test_event_signature         test_event_signature.cpp )
 
 # event loop
 add_stellyra_test( test_event_loops            test_event_loops.cpp )

@@ -180,7 +180,8 @@ public:
 	bool isConnected() const;
 
 	/**
-	 * @brief Releases ownership without disconnecting - the connection stays alive.
+	 * @brief Releases ownership without disconnecting - the connection stays
+	 * alive.
 	 */
 	void release();
 };
@@ -235,7 +236,7 @@ inline void ScopedConnection::release()
 class BlockGuard
 {
 	template< typename MutexType, typename... Args >
-	friend class BasicEvent;
+	friend class GenericEvent;
 
 	template< template< typename, typename... > class ImplT, typename MutexType, typename... Args >
 	friend class EventStorage;

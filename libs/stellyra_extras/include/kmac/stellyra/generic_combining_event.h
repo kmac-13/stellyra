@@ -1,18 +1,18 @@
 #pragma once
-#ifndef KMAC_STELLYRA_COMBINING_EVENT_H
-#define KMAC_STELLYRA_COMBINING_EVENT_H
+#ifndef KMAC_STELLYRA_GENERIC_COMBINING_EVENT_H
+#define KMAC_STELLYRA_GENERIC_COMBINING_EVENT_H
 
 /**
- * @file combining_event.h
+ * @file generic_combining_event.h
  * @brief Event that collects and aggregates handler return values.
  *
- * CombiningEvent<Combiner, ReturnType, Args...> fires all connected handlers
- * and passes their return values through a Combiner functor to produce a
- * single result.  Useful for validation pipelines, consensus queries, and
- * aggregated data collection.
+ * GenericCombiningEvent<Combiner, ReturnType, Args...> fires all connected
+ * handlers and passes their return values through a Combiner functor to
+ * produce a single result.  Useful for validation pipelines, consensus
+ * queries, and aggregated data collection.
  *
  * @code
- * CombiningEvent< Combiners::LogicalAnd<>, bool, std::string > validate { this };
+ * GenericCombiningEvent< Combiners::LogicalAnd<>, bool, std::string > validate { this };
  * validate.connect< &Checker::check >( checker1 );
  * validate.connect< &Checker::check >( checker2 );
  * bool allOk = validate( "input" );
@@ -45,8 +45,8 @@
  *
  * @section threading Threading
  *
- * CombiningEvent protects its slot table with a plain (non-recursive) mutex.
- * Reentrancy from within a handler is not supported - do not connect,
+ * GenericCombiningEvent protects its slot table with a plain (non-recursive)
+ * mutex.  Reentrancy from within a handler is not supported - do not connect,
  * disconnect, or trigger this event from inside a connected handler.
  *
  * All handlers are invoked Direct (synchronously on the triggering thread).
@@ -95,7 +95,7 @@ struct Tracked;
  *
  * Parallels HandlerEntry<Args...> but carries Callable<ReturnType(Args...)>
  * instead of Callable<void(Args...)>.  No EventLoop fields are needed -
- * CombiningEvent is always Direct.
+ * GenericCombiningEvent is always Direct.
  */
 template< typename ReturnType, typename... Args >
 struct CombiningHandlerEntry
@@ -135,11 +135,11 @@ inline void CombiningHandlerEntry< ReturnType, Args... >::init(
 // ===========================================================================
 
 /**
- * @brief Heap-allocated implementation object for CombiningEvent.
+ * @brief Heap-allocated implementation object for GenericCombiningEvent.
  *
  * Inherits EventImplBase so that the standard Connection handle and Trackable
  * tracking machinery work without modification.  EventLoop-related overrides
- * are no-ops because CombiningEvent is always Direct.
+ * are no-ops because GenericCombiningEvent is always Direct.
  */
 template< typename ReturnType, typename... Args >
 struct CombiningEventImpl : EventImplBase
@@ -186,12 +186,12 @@ struct CombiningEventImpl : EventImplBase
 	void blockHandler( uint32_t index, uint32_t generation ) override;
 	void unblockHandler( uint32_t index, uint32_t generation ) override;
 
-	// CombiningEvent is Direct-only - EventLoop operations are no-ops
+	// GenericCombiningEvent is Direct-only - EventLoop operations are no-ops
 	void updateSenderLoop( EventLoop* ) override {}
 	void updateHandlerLoop( uint32_t, uint32_t, EventLoop* ) override {}
 	void invokeDeferred( uint32_t, uint32_t, const std::shared_ptr< void >& ) override {}
 
-	// ---- API called directly by CombiningEvent -----------------------------
+	// ---- API called directly by GenericCombiningEvent -----------------------------
 
 	/// disconnect all active slots, caller must hold mutex
 	void preLockDisconnectAll();
@@ -358,18 +358,25 @@ inline void CombiningEventImpl< ReturnType, Args... >::disconnectSlotLocked( uin
 
 
 // ===========================================================================
-// CombiningEvent
+// GenericCombiningEvent
 // ===========================================================================
 
 /**
  * @brief Event that collects handler return values and combines them.
+ *
+ * This is the underlying class; BasicCombiningEvent (below) is the resolving
+ * alias calling code should generally name instead - it additionally accepts
+ * the function-style ReturnType(Args...) form (see the function_style section
+ * below).  For a plain Args... pack, the two names are interchangeable:
+ * GenericCombiningEvent<Combiner, ReturnType, Args...> and
+ * BasicCombiningEvent<Combiner, ReturnType, Args...> are the exact same type.
  *
  * @tparam Combiner functor: (Iter first, Iter last) -> ReturnType
  * @tparam ReturnType type returned by each handler and by the event itself
  * @tparam Args argument types forwarded to every handler
  */
 template< typename Combiner, typename ReturnType, typename... Args >
-class CombiningEvent
+class GenericCombiningEvent
 {
 public:
 	using HandlerType = Callable< ReturnType( Args... ) >;
@@ -382,22 +389,22 @@ private:
 
 public:
 	/// Construct with no owner.
-	CombiningEvent() = default;
+	GenericCombiningEvent() = default;
 
 	/**
 	 * @brief Construct with an owner Trackable.
 	 *
 	 * The owner is accepted for API consistency with BasicEvent.
-	 * CombiningEvent is Direct-only so the sender EventLoop is not used.
+	 * GenericCombiningEvent is Direct-only so the sender EventLoop is not used.
 	 */
-	explicit CombiningEvent( Trackable* owner );
+	explicit GenericCombiningEvent( Trackable* owner );
 
-	~CombiningEvent() = default;
+	~GenericCombiningEvent() = default;
 
-	CombiningEvent( const CombiningEvent& ) = delete;
-	CombiningEvent& operator=( const CombiningEvent& ) = delete;
-	CombiningEvent( CombiningEvent&& ) = default;
-	CombiningEvent& operator=( CombiningEvent&& ) = default;
+	GenericCombiningEvent( const GenericCombiningEvent& ) = delete;
+	GenericCombiningEvent& operator=( const GenericCombiningEvent& ) = delete;
+	GenericCombiningEvent( GenericCombiningEvent&& ) = default;
+	GenericCombiningEvent& operator=( GenericCombiningEvent&& ) = default;
 
 	// =========================================================================
 	// triggering
@@ -613,7 +620,7 @@ private:
 // ===========================================================================
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline CombiningEvent< Combiner, ReturnType, Args... >::CombiningEvent( Trackable* /*owner*/ )
+inline GenericCombiningEvent< Combiner, ReturnType, Args... >::GenericCombiningEvent( Trackable* /*owner*/ )
 {
 }
 
@@ -623,7 +630,7 @@ inline CombiningEvent< Combiner, ReturnType, Args... >::CombiningEvent( Trackabl
 // ===========================================================================
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline ReturnType CombiningEvent< Combiner, ReturnType, Args... >::operator()( Args... args )
+inline ReturnType GenericCombiningEvent< Combiner, ReturnType, Args... >::operator()( Args... args )
 {
 	// empty results vector serves as the "nothing to combine" base case for
 	// both the blocked path and the no-active-handlers path
@@ -685,13 +692,13 @@ inline ReturnType CombiningEvent< Combiner, ReturnType, Args... >::operator()( A
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline ReturnType CombiningEvent< Combiner, ReturnType, Args... >::trigger( Args... args )
+inline ReturnType GenericCombiningEvent< Combiner, ReturnType, Args... >::trigger( Args... args )
 {
 	return operator()( std::forward< Args >( args )... );
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline ReturnType CombiningEvent< Combiner, ReturnType, Args... >::emit( Args... args )
+inline ReturnType GenericCombiningEvent< Combiner, ReturnType, Args... >::emit( Args... args )
 {
 	return operator()( std::forward< Args >( args )... );
 }
@@ -702,19 +709,19 @@ inline ReturnType CombiningEvent< Combiner, ReturnType, Args... >::emit( Args...
 // ===========================================================================
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline void CombiningEvent< Combiner, ReturnType, Args... >::block()
+inline void GenericCombiningEvent< Combiner, ReturnType, Args... >::block()
 {
 	_impl->block();
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline void CombiningEvent< Combiner, ReturnType, Args... >::unblock()
+inline void GenericCombiningEvent< Combiner, ReturnType, Args... >::unblock()
 {
 	_impl->unblock();
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline BlockGuard CombiningEvent< Combiner, ReturnType, Args... >::blockGuard()
+inline BlockGuard GenericCombiningEvent< Combiner, ReturnType, Args... >::blockGuard()
 {
 	_impl->block();
 	return BlockGuard(
@@ -729,7 +736,7 @@ inline BlockGuard CombiningEvent< Combiner, ReturnType, Args... >::blockGuard()
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< auto Method, typename T >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect( T& receiver )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connect( T& receiver )
 {
 	Trackable* tracker = nullptr;
 	if constexpr ( std::is_base_of_v< Trackable, T > )
@@ -743,7 +750,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect( T& r
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< auto Method, typename T >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect( Tracked< T > tracked )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connect( Tracked< T > tracked )
 {
 	return connectImpl(
 		HandlerType::template create< Method >( &tracked.receiver ),
@@ -752,7 +759,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect( Trac
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< typename T, typename U >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connect(
 	T& receiver,
 	ReturnType ( U::*method )( Args... ) )
 {
@@ -778,7 +785,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect(
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< typename T, typename U >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connect(
 	Tracked< T > tracked,
 	ReturnType ( U::*method )( Args... ) )
 {
@@ -795,7 +802,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connect(
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< auto Method, typename T >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce( T& receiver )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnce( T& receiver )
 {
 	Trackable* tracker = nullptr;
 	if constexpr ( std::is_base_of_v< Trackable, T > )
@@ -809,7 +816,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce( 
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< auto Method, typename T >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce( Tracked< T > tracked )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnce( Tracked< T > tracked )
 {
 	return connectImpl(
 		HandlerType::template create< Method >( &tracked.receiver ),
@@ -818,7 +825,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce( 
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< typename T, typename U >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
 	T& receiver,
 	ReturnType ( U::*method )( Args... ) )
 {
@@ -840,7 +847,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< typename T, typename U >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
 	Tracked< T > tracked,
 	ReturnType ( U::*method )( Args... ) )
 {
@@ -862,26 +869,26 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnce(
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< ReturnType (*Func)( Args... ) >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectFree()
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectFree()
 {
 	return connectImpl( HandlerType::template create< Func >(), nullptr, false );
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectFree( ReturnType (*func)( Args... ) )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectFree( ReturnType (*func)( Args... ) )
 {
 	return connectImpl( HandlerType::create( func ), nullptr, false );
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< ReturnType (*Func)( Args... ) >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceFree()
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnceFree()
 {
 	return connectImpl( HandlerType::template create< Func >(), nullptr, true );
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceFree( ReturnType (*func)( Args... ) )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnceFree( ReturnType (*func)( Args... ) )
 {
 	return connectImpl( HandlerType::create( func ), nullptr, true );
 }
@@ -892,13 +899,13 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceFr
 // ===========================================================================
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectLambda( HandlerType&& handler )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectLambda( HandlerType&& handler )
 {
 	return connectImpl( std::move( handler ), nullptr, false );
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectLambda(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectLambda(
 	Trackable& tracker,
 	HandlerType&& handler )
 {
@@ -907,14 +914,14 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectLambda
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< typename F, typename >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectLambda( F&& functor )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectLambda( F&& functor )
 {
 	return connectImpl( HandlerType::create( std::forward< F >( functor ) ), nullptr, false );
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< typename F >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectLambda(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectLambda(
 	Trackable& tracker,
 	F&& functor )
 {
@@ -922,13 +929,13 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectLambda
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceLambda( HandlerType&& handler )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnceLambda( HandlerType&& handler )
 {
 	return connectImpl( std::move( handler ), nullptr, true );
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceLambda(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnceLambda(
 	Trackable& tracker,
 	HandlerType&& handler )
 {
@@ -937,14 +944,14 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceLa
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< typename F, typename >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceLambda( F&& functor )
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnceLambda( F&& functor )
 {
 	return connectImpl( HandlerType::create( std::forward< F >( functor ) ), nullptr, true );
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< typename F >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceLambda(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectOnceLambda(
 	Trackable& tracker,
 	F&& functor )
 {
@@ -957,7 +964,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectOnceLa
 // ===========================================================================
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnect( Trackable& tracker )
+inline void GenericCombiningEvent< Combiner, ReturnType, Args... >::disconnect( Trackable& tracker )
 {
 	auto connections = tracker.extractConnectionsTo( _impl.get() );
 	_impl->disconnectHandlers( connections );
@@ -965,7 +972,7 @@ inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnect( Trackab
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< auto Method, typename T >
-inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnect( T& receiver )
+inline void GenericCombiningEvent< Combiner, ReturnType, Args... >::disconnect( T& receiver )
 {
 	const HandlerType target = HandlerType::template create< Method >( &receiver );
 
@@ -986,7 +993,7 @@ inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnect( T& rece
 
 template< typename Combiner, typename ReturnType, typename... Args >
 template< ReturnType (*Func)( Args... ) >
-inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnectFree()
+inline void GenericCombiningEvent< Combiner, ReturnType, Args... >::disconnectFree()
 {
 	const HandlerType target = HandlerType::template create< Func >();
 
@@ -1006,7 +1013,7 @@ inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnectFree()
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnectFree(
+inline void GenericCombiningEvent< Combiner, ReturnType, Args... >::disconnectFree(
 	ReturnType (*func)( Args... ) )
 {
 	const HandlerType target = HandlerType::create( func );
@@ -1027,7 +1034,7 @@ inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnectFree(
 }
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnectAll()
+inline void GenericCombiningEvent< Combiner, ReturnType, Args... >::disconnectAll()
 {
 	platform::LockGuard< platform::Mutex > lock( _impl->mutex );
 	_impl->preLockDisconnectAll();
@@ -1040,7 +1047,7 @@ inline void CombiningEvent< Combiner, ReturnType, Args... >::disconnectAll()
 
 template< typename Combiner, typename ReturnType, typename... Args >
 inline std::size_t
-CombiningEvent< Combiner, ReturnType, Args... >::slotCount() const
+GenericCombiningEvent< Combiner, ReturnType, Args... >::slotCount() const
 {
 	platform::LockGuard< platform::Mutex > lock( _impl->mutex );
 	return _impl->handlers.size();
@@ -1052,7 +1059,7 @@ CombiningEvent< Combiner, ReturnType, Args... >::slotCount() const
 // ===========================================================================
 
 template< typename Combiner, typename ReturnType, typename... Args >
-inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectImpl(
+inline Connection GenericCombiningEvent< Combiner, ReturnType, Args... >::connectImpl(
 	HandlerType&& handler,
 	Trackable* tracker,
 	bool singleShot )
@@ -1104,16 +1111,7 @@ inline Connection CombiningEvent< Combiner, ReturnType, Args... >::connectImpl(
 	return Connection( std::move( weak ), index, gen );
 }
 
-
-// ===========================================================================
-// aliases
-// ===========================================================================
-
-/** @brief Alias for users that prefer signal/emit terminology. */
-template< typename Combiner, typename ReturnType, typename... Args >
-using CombiningSignal = CombiningEvent< Combiner, ReturnType, Args... >;
-
 } // namespace stellyra
 } // namespace kmac
 
-#endif // KMAC_STELLYRA_COMBINING_EVENT_H
+#endif // KMAC_STELLYRA_GENERIC_COMBINING_EVENT_H

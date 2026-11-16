@@ -9,7 +9,7 @@ TEST( CombiningAndGroups, CombiningEventLogicalAnd )
 	class TestObject : public stellyra::Trackable
 	{
 	public:
-		stellyra::CombiningEvent< stellyra::Combiners::LogicalAnd<>, bool, int > validate{ this };
+		stellyra::BasicCombiningEvent< stellyra::Combiners::LogicalAnd<>, bool, int > validate{ this };
 	};
 
 	auto obj = std::make_unique< TestObject >();
@@ -27,7 +27,7 @@ TEST( CombiningAndGroups, CombiningEventLogicalAndWithCheckers )
 	auto checker1 = std::make_unique< Checker >();
 	auto checker2 = std::make_unique< Checker >();
 
-	stellyra::CombiningEvent< stellyra::Combiners::LogicalAnd<>, bool, std::string > validate{ nullptr };
+	stellyra::BasicCombiningEvent< stellyra::Combiners::LogicalAnd<>, bool, std::string > validate{ nullptr };
 
 	validate.connectLambda( [ c = checker1.get() ]( const std::string& s ) { return c->check( s ); } );
 	validate.connectLambda( [ c = checker2.get() ]( const std::string& s ) { return c->check( s ); } );
@@ -50,7 +50,7 @@ TEST( CombiningAndGroups, CombiningEventLogicalOr )
 	class TestObject : public stellyra::Trackable
 	{
 	public:
-		stellyra::CombiningEvent< stellyra::Combiners::LogicalOr<>, bool, std::string > validate{ this };
+		stellyra::BasicCombiningEvent< stellyra::Combiners::LogicalOr<>, bool, std::string > validate{ this };
 	};
 
 	auto obj = std::make_unique< TestObject >();

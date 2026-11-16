@@ -18,7 +18,7 @@ General benefits of an event/observer-style design, independent of threading mod
 What's specific to Stellyra:
 
 - **Automatic receiver-lifetime safety** - `Trackable`/`Tracked<T>` disconnect every tracked connection before a receiver is destroyed, removing the dangling-callback bug class common to hand-rolled observer code
-- **Per-instance thread-safety strategy** - the mutex strategy (`Event`/`SharedEvent`/`SingleThreadedEvent`/`ConcurrentEvent`) is a template parameter chosen per event instance, not a single library-wide compile flag, so one binary can mix all of them
+- **Per-instance thread-safety strategy** - the mutex strategy (`RecursiveEvent`/`SharedEvent`/`SingleThreadedEvent`/`ConcurrentEvent`) is a template parameter chosen per event instance, not a single library-wide compile flag, so one binary can mix all of them
 - **Built-in deferred dispatch** - the `EventLoop`-aware `Direct`/`Deferred`/`Auto` connection model handles cross-thread marshalling without an external queue or hand-written posting code; a receiver with its own `EventLoop` has every `Auto`/`Deferred`-resolved handler call serialized onto that loop's drain thread, no matter how many senders or threads connect to it, which is the same guarantee Qt's queued connections give a receiver's thread affinity, so the receiver's own handler code needs no internal mutex to protect itself against concurrent calls (an explicitly `Direct`-declared connection from a sender outside that loop is the one exception - see "How Stellyra's, Qt's, and vdk-signals' thread models differ?" below.)
 - **Bare-metal / zero-overhead mode** - `STELLYRA_THREAD_SAFE=0` strips all mutex/atomic overhead for single-core embedded targets without changing the API
 - **Introspection** - `EventInspector` gives read-only, lock-respecting connection-table snapshots and Graphviz DOT dumps of a live event's wiring, for debugging connection graphs that have grown too tangled to trace by reading source
@@ -37,7 +37,7 @@ The rest of this FAQ covers what's specific to Stellyra's own design - thread sa
 
 No - not for senders or receivers.
 
-**Senders** can either inherit from `stellyra::Trackable` and pass this to the `Event` constructor (simplest), or pass the address of a `stellyra::Trackable` (or `stellyra::Anchor`) obtained some other way - a member of the sender or an instance supplied to the sender's constructor.
+**Senders** can either inherit from `stellyra::Trackable` and pass this to the event's constructor (simplest), or pass the address of a `stellyra::Trackable` (or `stellyra::Anchor`) obtained some other way - a member of the sender or an instance supplied to the sender's constructor.
 
 **Receivers** can either inherit from `stellyra::Trackable` (simplest) or pair a non-inheriting receiver with a standalone `stellyra::Trackable`/`Anchor` via `Tracked<T>{ receiver, tracker }`, passed to `connect`/`connectFree`/`connectLambda` in place of a bare receiver.  In both cases, the receiver must remain alive for as long as any event it's connected to might still be dispatching into it.  That can be arranged two ways: let the tracker's destruction handle it automatically (destroying the tracker runs `Trackable::~Trackable()`, which disconnects every connection that tracker was holding, so no further dispatch can reach the receiver afterward), or disconnect explicitly beforehand - via a stored `Connection`'s `disconnect()`/`ScopedConnection` or `event.disconnect( receiver )` - so there's nothing left to dispatch through by the time the receiver is destroyed.  Neither approach protects against a dispatch already in progress when destruction begins; avoiding that overlap is the caller's ordinary responsibility.  For an inheriting receiver, the tracker mechanism runs automatically as part of the receiver's own destruction.  For the non-inheriting `Tracked<T>` pattern, the standalone tracker and the receiver are two separate objects the caller must sequence deliberately - explicit disconnection removes that sequencing concern entirely.
 
@@ -58,7 +58,7 @@ These four are specific to single-threaded deferred execution; they're in additi
 
 If you need even less overhead, set `STELLYRA_THREAD_SAFE=0` to replace all internal mutexes with zero-overhead no-ops.
 
-If you don't need an `EventLoop` at all - no deferred execution, just immediate direct dispatch - you can use `Event` with no `EventLoop` assigned.  Handlers execute synchronously on the calling thread with no queue overhead.
+If you don't need an `EventLoop` at all - no deferred execution, just immediate direct dispatch - you can use `RecursiveEvent` with no `EventLoop` assigned.  Handlers execute synchronously on the calling thread with no queue overhead.
 
 ---
 
@@ -74,11 +74,11 @@ It depends on whether the sender has an EventLoop:
 
 ### Does SharedEvent or ConcurrentEvent still dispatch concurrently if it has an owner EventLoop?
 
-No - once an owner `EventLoop` is assigned, both lose the thing that distinguishes them from a plain `Event`.
+No - once an owner `EventLoop` is assigned, both lose the thing that distinguishes them from a plain `RecursiveEvent`.
 
-`BasicEvent::operator()` and `BasicConcurrentEvent::operator()` run the identical sender-loop check, and it's independent of `MutexType`: any trigger from a thread that isn't eligible to dispatch directly on the owner's loop has its entire trigger posted to that loop and runs later during `drain()`.  `EventLoop::drain()` guards itself with a CAS so only one thread can ever be draining a given loop at a time.  Put together, `dispatch()` is never called by more than one thread at a time once an owner loop exists - regardless of whether the event is `Event`, `SharedEvent`, `ConcurrentEvent`, etc.
+`BasicEvent::operator()` and `BasicConcurrentEvent::operator()` run the identical sender-loop check, and it's independent of `MutexType`: any trigger from a thread that isn't eligible to dispatch directly on the owner's loop has its entire trigger posted to that loop and runs later during `drain()`.  `EventLoop::drain()` guards itself with a CAS so only one thread can ever be draining a given loop at a time.  Put together, `dispatch()` is never called by more than one thread at a time once an owner loop exists - regardless of whether the event is `RecursiveEvent`, `SharedEvent`, `ConcurrentEvent`, etc.
 
-- `SharedEvent`'s `SharedLock`-based concurrent dispatch becomes uncontended by construction - there's no second thread left to share the lock with; `connect()`/`disconnect()` still take the exclusive lock and still block against whatever's dispatching, same as for `Event`
+- `SharedEvent`'s `SharedLock`-based concurrent dispatch becomes uncontended by construction - there's no second thread left to share the lock with; `connect()`/`disconnect()` still take the exclusive lock and still block against whatever's dispatching, same as for `RecursiveEvent`
 - `ConcurrentEvent`'s lock-free `EpochDomain`/atomic-slot design goes unexercised for its actual purpose - there's nothing left to arbitrate without a second concurrent dispatching thread
 
 Both types remain exactly what they are, API-wise, and still dispatch correctly from the loop's own drain thread - this isn't a bug, just a consequence of the sender-side deferral being independent of `MutexType`.  If genuinely concurrent dispatch from multiple threads is what you actually want, don't assign the event's owner an `EventLoop` - let triggers run directly on the calling thread instead.
@@ -103,7 +103,7 @@ It depends on what "receiver" means for that connection - specifically, whether 
 
 ---
 
-### What happens if I trigger an Event with a Deferred connection and the receiver has no EventLoop?
+### What happens if I trigger an event with a Deferred connection and the receiver has no EventLoop?
 
 The invocation is silently dropped.  Enable `STELLYRA_LOG_CONNECTION_ISSUES` to receive a warning when this occurs.
 
@@ -117,9 +117,9 @@ See [`docs/MIGRATION.md`](MIGRATION.md) for a step-by-step guide on migrating to
 
 ### What is the difference between stellyra.h and stellyra_extras.h?
 
-`<kmac/stellyra.h>` provides the core event system: `Event`/`SharedEvent`/`SingleThreadedEvent`, `PrivateEvent`, `Trackable`, `EventLoop`, `Connection`/`ScopedConnection`/`BlockGuard`, and compile-time configuration.
+`<kmac/stellyra.h>` provides the core event system: `RecursiveEvent`/`SharedEvent`/`SingleThreadedEvent`, `RecursivePrivateEvent`, `Trackable`, `EventLoop`, `Connection`/`ScopedConnection`/`BlockGuard`, and compile-time configuration.
 
-`<kmac/stellyra_extras.h>` includes everything in `stellyra.h` plus extended functionality: `ConnectionGuard`, `ConnectionGroup`, `CombiningEvent` plus combiners, `ConcurrentEvent`, `EventInspector`, `RecordableEvent`, `Property`/`ReadOnlyProperty`/`ComputedProperty`/`ConstProperty`, and the optional `FastRecursiveMutex`/`SpinRecursiveMutex` mutex types.
+`<kmac/stellyra_extras.h>` includes everything in `stellyra.h` plus extended functionality: `ConnectionGuard`, `ConnectionGroup`, `BasicCombiningEvent` plus combiners, `ConcurrentEvent`, `EventInspector`, `RecursiveRecordableEvent`, `Property`/`ReadOnlyProperty`/`ComputedProperty`/`ConstProperty`, and the optional `FastRecursiveMutex`/`SpinRecursiveMutex` mutex types.
 
 Include `stellyra_extras.h` during development and debugging or if `ConcurrentEvent` is needed.  For production code that only needs the core event dispatch mechanism, `stellyra.h` is sufficient.
 

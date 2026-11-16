@@ -1,26 +1,29 @@
 #pragma once
-#ifndef KMAC_STELLYRA_BASIC_CONCURRENT_EVENT_H
-#define KMAC_STELLYRA_BASIC_CONCURRENT_EVENT_H
+#ifndef KMAC_STELLYRA_GENERIC_CONCURRENT_EVENT_H
+#define KMAC_STELLYRA_GENERIC_CONCURRENT_EVENT_H
 
 /**
- * @file basic_concurrent_event.h
- * @brief BasicConcurrentEvent<MutexType, Args...> - the triggerable, primary
+ * @file generic_concurrent_event.h
+ * @brief GenericConcurrentEvent<MutexType, Args...> - the triggerable, primary
  * event type, backed by BasicConcurrentEventImpl through the generalised
- * EventStorage.
+ * EventStorage, and BasicConcurrentEvent<MutexType, Args...> - a resolving
+ * alias over it that additionally accepts the function-style signature
+ * form (see event_signature.h), mirroring GenericEvent/BasicEvent exactly.
  *
- * Mirrors BasicEvent exactly in shape: EventStorage supplies the full
+ * Mirrors GenericEvent exactly in shape: EventStorage supplies the full
  * connect/connectFree/connectLambda/disconnect/ConnParams/forwardTo
  * surface generically, this file adds only operator()/trigger()/emit().
  *
  * Direct, Deferred, and Auto-resolved connections are all supported, as is
  * sender-deferred triggering (see operator()'s docs below) - the connect-
- * side API is the full one BasicEvent offers today, and dispatch behavior
+ * side API is the full one GenericEvent offers today, and dispatch behavior
  * matches it.
  */
 
 #include "basic_concurrent_event_impl.h"
 
 #include <kmac/stellyra/event_loop.h>
+#include <kmac/stellyra/event_signature.h>
 #include <kmac/stellyra/event_storage.h>
 #include <kmac/stellyra/platform.h>
 #include <kmac/stellyra/trackable.h>
@@ -39,23 +42,27 @@ namespace stellyra {
  * Inherits connection management from EventStorage and adds
  * operator() / trigger() / emit() for dispatching to connected handlers.
  *
+ * This is the underlying class; BasicConcurrentEvent (below) is the alias
+ * calling code should name instead when the function-style signature form
+ * is wanted - for a plain Args... pack the two names are interchangeable.
+ *
  * @tparam MutexType synchronisation strategy
  * @tparam Args argument types forwarded to connected handlers
  */
 template< typename MutexType, typename... Args >
-class BasicConcurrentEvent : public EventStorage< BasicConcurrentEventImpl, MutexType, Args... >
+class GenericConcurrentEvent : public EventStorage< BasicConcurrentEventImpl, MutexType, Args... >
 {
 	using Base = EventStorage< BasicConcurrentEventImpl, MutexType, Args... >;
 
 public:
 	using Base::Base;  // inherit constructors
 
-	~BasicConcurrentEvent() = default;
+	~GenericConcurrentEvent() = default;
 
-	BasicConcurrentEvent( const BasicConcurrentEvent& ) = delete;
-	BasicConcurrentEvent& operator=( const BasicConcurrentEvent& ) = delete;
-	BasicConcurrentEvent( BasicConcurrentEvent&& ) = default;
-	BasicConcurrentEvent& operator=( BasicConcurrentEvent&& ) = default;
+	GenericConcurrentEvent( const GenericConcurrentEvent& ) = delete;
+	GenericConcurrentEvent& operator=( const GenericConcurrentEvent& ) = delete;
+	GenericConcurrentEvent( GenericConcurrentEvent&& ) = default;
+	GenericConcurrentEvent& operator=( GenericConcurrentEvent&& ) = default;
 
 	/**
 	 * @brief Trigger the event - dispatch to all connected, unblocked,
@@ -68,7 +75,7 @@ public:
 	 * posted to that loop instead of dispatching here and now - the
 	 * *whole* dispatch() call happens later, on the owner's home thread,
 	 * against whatever the handler list looks like at that later time.
-	 * Exactly mirrors BasicEvent::operator() (event.h); dispatch() re-enters
+	 * Mirrors GenericEvent::operator() (basic_event.h); dispatch() re-enters
 	 * the epoch fresh whenever it actually runs, so nothing about a deferred
 	 * trigger needs to survive the interval except the event's own weak
 	 * reference and the captured arguments.
@@ -98,7 +105,7 @@ public:
 };
 
 template< typename MutexType, typename... Args >
-inline void BasicConcurrentEvent< MutexType, Args... >::operator()( Args... args )
+inline void GenericConcurrentEvent< MutexType, Args... >::operator()( Args... args )
 {
 	if ( this->_impl->isBlocked() )
 	{
@@ -120,9 +127,9 @@ inline void BasicConcurrentEvent< MutexType, Args... >::operator()( Args... args
 		// regardless of whether the event is still valid or not;
 		// NOTE that the same strong reference requirement is needed for:
 		// - BasicEventImpl::dispatch
-		// - BasicEvent::operator()
+		// - GenericEvent::operator()
 		// - BasicConcurrentEventImpl::dispatch
-		// - BasicRecordableEvent::operator()
+		// - GenericRecordableEvent::operator()
 		auto self = this->_impl;
 		senderLoop->post(
 			EventLoop::Task::create(
@@ -141,13 +148,13 @@ inline void BasicConcurrentEvent< MutexType, Args... >::operator()( Args... args
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicConcurrentEvent< MutexType, Args... >::trigger( Args... args )
+inline void GenericConcurrentEvent< MutexType, Args... >::trigger( Args... args )
 {
 	operator()( std::forward< Args >( args )... );
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicConcurrentEvent< MutexType, Args... >::emit( Args... args )
+inline void GenericConcurrentEvent< MutexType, Args... >::emit( Args... args )
 {
 	operator()( std::forward< Args >( args )... );
 }
@@ -155,4 +162,4 @@ inline void BasicConcurrentEvent< MutexType, Args... >::emit( Args... args )
 } // namespace stellyra
 } // namespace kmac
 
-#endif // KMAC_STELLYRA_BASIC_CONCURRENT_EVENT_H
+#endif // KMAC_STELLYRA_GENERIC_CONCURRENT_EVENT_H

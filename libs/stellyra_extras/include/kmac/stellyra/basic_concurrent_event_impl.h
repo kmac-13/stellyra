@@ -4,8 +4,9 @@
 
 /**
  * @file basic_concurrent_event_impl.h
- * @brief BasicConcurrentEventImpl<MutexType, Args...> - the primary, EventStorage-
- * compatible lock-free-dispatch implementation behind BasicConcurrentEvent.
+ * @brief BasicConcurrentEventImpl<MutexType, Args...> - the primary,
+ * EventStorage-compatible lock-free-dispatch implementation behind
+ * GenericConcurrentEvent.
  *
  * Each slot is a std::atomic<Entry*>, reclaimed through EpochDomain rather
  * than protected by a lock, extended with everything EventStorage's
@@ -13,8 +14,9 @@
  * an ImplT:
  *
  *   - MutexType mutex, Trackable* owner, WeakPtr<EventImplBase> weakSelf
- *   - addConnection(...) with the exact signature EventImpl<MutexType,Args...>
- *     uses, so EventStorage::connectImpl() cannot tell the two apart
+ *   - addConnection(...) with the exact signature
+ *     EventImpl<MutexType,Args...> uses, so EventStorage::connectImpl()
+ *     cannot tell the two apart
  *   - findFirstMatch(...) for by-target disconnect<Method>/disconnectFree/
  *     disconnect(receiver, method)
  *   - preLockDisconnectAll() for disconnectAll()
@@ -34,7 +36,7 @@
  * see their docs below for the atomic-fields-not-whole-Entry-replacement
  * design this needed) are all supported. Sender-deferred (marshalling the
  * *trigger* call itself onto the owner's home thread) lives one layer up,
- * in BasicConcurrentEvent::operator() (basic_concurrent_event.h) - entirely
+ * in GenericConcurrentEvent::operator() (basic_concurrent_event.h) - entirely
  * orthogonal to anything here, and needed no change to this file at all.
  *
  * Receiver-deferred design note (see invokeDeferred() below for the full
@@ -127,21 +129,21 @@ private:
 	 * could ever be done data-race-free without a second synchronisation
 	 * mechanism beyond the epoch guard that already protects the Entry
 	 * itself from deallocation - and nothing here needs to replace it.
-	 * `resolvedType`/`receiverLoop` are small, trivially-copyable, and nothing
-	 * else in Entry needs to change post-construction, so plain atomics are
-	 * the whole fix: writers (holding `mutex`, serialised against each
-	 * other and against connect/disconnect) store; dispatch() loads. This
-	 * means BasicConcurrentEvent's re-resolution guarantee is weaker than BasicEvent's:
-	 * BasicEvent's updateSenderLoop()/updateHandlerLoop() run under the
-	 * exact same mutex dispatch() holds, so an in-flight dispatch() never
-	 * observes a topology change mid-walk. Here dispatch() never takes
-	 * `mutex` at all, so a concurrent updateSenderLoop()/updateHandlerLoop()
-	 * can genuinely race a live dispatch() - each individual entry's
-	 * resolvedType is read atomically (never torn), but which entries in
-	 * one dispatch() walk see the old vs. new topology is not
-	 * deterministic. Eventually consistent, not linearizable against
-	 * dispatch() - a deliberate, documented trade for lock-free dispatch,
-	 * not an oversight.
+	 * `resolvedType`/`receiverLoop` are small, trivially-copyable, and
+	 * nothing else in Entry needs to change post-construction, so plain
+	 * atomics are the whole fix: writers (holding `mutex`, serialised
+	 * against each other and against connect/disconnect) store; dispatch()
+	 * loads.  This means BasicConcurrentEvent's re-resolution guarantee is
+	 * weaker than  GenericEvent's: GenericEvent's updateSenderLoop()/
+	 * updateHandlerLoop()  run under the exact same mutex dispatch() holds,
+	 * so an in-flight dispatch() never observes a topology change mid-walk.
+	 * Here dispatch() never takes `mutex` at all, so a concurrent
+	 * updateSenderLoop()/updateHandlerLoop() can genuinely race a live
+	 * dispatch() - each individual entry's resolvedType is read atomically
+	 * (never torn), but which entries in one dispatch() walk see the old vs
+	 * new topology is not deterministic.  Eventually consistent, not
+	 * linearizable against dispatch() - a deliberate, documented trade for
+	 * lock-free dispatch, not an oversight.
 	 */
 	struct Entry
 	{
@@ -252,9 +254,9 @@ public:
 	 *
 	 * @note `hasOwner` is accepted for interface parity but not yet stored
 	 * anywhere: it only matters for BasicEvent-style introspection
-	 * (EventInspector), which does not yet support BasicConcurrentEvent - a real gap,
-	 * not lost information (nothing reads it, nothing depends on it being
-	 * right, yet).
+	 * (EventInspector), which does not yet support BasicConcurrentEvent - a
+	 * real gap, not lost information (nothing reads it, nothing depends on
+	 * it being right, yet).
 	 */
 	uint32_t addConnection(
 		HandlerType&& handler, uint64_t tag, uint16_t priority,
@@ -282,8 +284,8 @@ public:
 	void dispatch( Args... args );
 
 	/**
-	 * @brief Disconnect all active handlers. Caller must already hold `mutex`
-	 * - same contract as EventImpl::preLockDisconnectAll().
+	 * @brief Disconnect all active handlers. Caller must already hold
+	 * `mutex` - same contract as EventImpl::preLockDisconnectAll().
 	 */
 	void preLockDisconnectAll();
 
@@ -370,7 +372,8 @@ private:
 	static SlotArray* allocateSlotArray( size_t capacity );
 
 	/**
-	 * @brief Called under `mutex`. Doubles the slot array, publishes it, retires the old one.
+	 * @brief Called under `mutex`. Doubles the slot array, publishes it,
+	 * retires the old one.
 	 */
 	SlotArray* growSlots();
 
@@ -382,7 +385,8 @@ private:
 	void rebuildOrderLocked();
 
 	/**
-	 * @brief Called under `mutex`. Publishes `snap` (possibly null) and retires whatever was published before.
+	 * @brief Called under `mutex`. Publishes `snap` (possibly null) and
+	 * retires whatever was published before.
 	 */
 	void publishOrder( OrderSnapshot* snap );
 
@@ -594,9 +598,9 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::dispatch( Args... ar
 			// the associated event is still valid or not;
 			// NOTE that the same strong reference requirement is needed for:
 			// - BasicEventImpl::dispatch
-			// - BasicEvent::operator()
-			// - BasicConcurrentEvent::operator()
-			// - BasicRecordableEvent::operator()
+			// - GenericEvent::operator()
+			// - GenericConcurrentEvent::operator()
+			// - GenericRecordableEvent::operator()
 			auto self = weakSelf.lock();
 			const uint32_t index = i;
 			const uint32_t generation = entry->generation;

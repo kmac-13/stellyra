@@ -13,7 +13,7 @@
 class SecureButton : public stellyra::Trackable
 {
 public:
-	stellyra::PEvent< SecureButton, int, int > clicked{ this };
+	stellyra::RecursivePrivateEvent< SecureButton, int, int > clicked{ this };
 
 	void click( int x, int y )
 	{
@@ -707,7 +707,7 @@ TEST( MoveOnlyCapture, WorksOnDeferredConnection )
 	sender.setEventLoop( &loop );
 	receiver.setEventLoop( &loop );
 
-	stellyra::Event< int > event{ &sender };
+	stellyra::RecursiveEvent< int > event{ &sender };
 
 	auto ptr = std::make_unique< int >( 42 );
 	std::atomic< bool > handlerCalled{ false };

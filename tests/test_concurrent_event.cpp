@@ -19,7 +19,7 @@
  * rule documented in basic_concurrent_event_impl.h).
  */
 
-#include "kmac/stellyra/concurrent_event.h"
+#include "kmac/stellyra/concurrent_event_types.h"
 
 #include <gtest/gtest.h>
 
@@ -33,7 +33,7 @@
 
 TEST( ConcurrentEvent, BasicConnectTriggerDisconnect )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 
 	int sum = 0;
 	stellyra::Connection conn = event.connectLambda( [ & ]( int v ) { sum += v; } );
@@ -52,7 +52,7 @@ TEST( ConcurrentEvent, BasicConnectTriggerDisconnect )
 
 TEST( ConcurrentEvent, DirectConnectionTypeAccepted )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 	int calls = 0;
 	stellyra::Connection conn = event.connectLambda(
 		[ & ]( int ) { ++calls; }, stellyra::ConnectionType::Direct );
@@ -64,7 +64,7 @@ TEST( ConcurrentEvent, DirectConnectionTypeAccepted )
 
 TEST( ConcurrentEvent, StaleConnectionIgnored )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 
 	int calls = 0;
 	stellyra::Connection first = event.connectLambda( [ & ]( int ) { ++calls; } );
@@ -84,7 +84,7 @@ TEST( ConcurrentEvent, StaleConnectionIgnored )
 
 TEST( ConcurrentEvent, BlockUnblock )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 
 	int calls = 0;
 	stellyra::Connection conn = event.connectLambda( [ & ]( int ) { ++calls; } );
@@ -102,7 +102,7 @@ TEST( ConcurrentEvent, BlockUnblock )
 
 TEST( ConcurrentEvent, SingleShotBatching )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 
 	int fastFires = 0;
 	int onceFires = 0;
@@ -127,7 +127,7 @@ TEST( ConcurrentEvent, SingleShotBatching )
 
 TEST( ConcurrentEvent, ScopedConnectionDisconnectsOnDestruction )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 	int calls = 0;
 	{
 		stellyra::ScopedConnection guard( event.connectLambda( [ & ]( int ) { ++calls; } ) );
@@ -147,7 +147,7 @@ TEST( ConcurrentEvent, ScopedConnectionDisconnectsOnDestruction )
  */
 TEST( ConcurrentEvent, UnrelatedHandlerSurvivesDisconnect )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 	std::vector< int > fireCounts( 20, 0 );
 	std::vector< stellyra::Connection > conns;
 
@@ -188,7 +188,7 @@ TEST( ConcurrentEvent, UnrelatedHandlerSurvivesDisconnect )
 
 TEST( ConcurrentEventReentrancy, ConnectDuringTrigger )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 
 	int baseFires = 0;
 	int addedFires = 0;
@@ -209,7 +209,7 @@ TEST( ConcurrentEventReentrancy, ConnectDuringTrigger )
 
 TEST( ConcurrentEventReentrancy, SelfDisconnectDuringTrigger )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 
 	int fires = 0;
 	stellyra::Connection self;
@@ -227,7 +227,7 @@ TEST( ConcurrentEventReentrancy, SelfDisconnectDuringTrigger )
 
 TEST( ConcurrentEventReentrancy, NestedTriggerSeveralLevelsDeep )
 {
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 
 	constexpr int MAX_DEPTH = 5;
 	int callsAtDepth[ MAX_DEPTH + 1 ] = { 0 };
@@ -268,7 +268,7 @@ TEST( ConcurrentEventConcurrency, ConnectDisconnectDuringTrigger )
 
 	for ( int trial = 0; trial < TRIALS; ++trial )
 	{
-		stellyra::ConcurrentEvent< int > event;
+		stellyra::StandardConcurrentEvent< int > event;
 		std::atomic< uint64_t > dispatchCount { 0 };
 
 		std::vector< stellyra::Connection > longLived;
@@ -334,7 +334,7 @@ TEST( ConcurrentEventConcurrency, ReclamationRaceUnderRetireHeavyWriter )
 
 	for ( int trial = 0; trial < TRIALS; ++trial )
 	{
-		stellyra::ConcurrentEvent< int > event;
+		stellyra::StandardConcurrentEvent< int > event;
 		std::atomic< uint64_t > fires { 0 };
 
 		// one long-lived handler every dispatch should see
@@ -394,7 +394,7 @@ TEST( ConcurrentEventConcurrency, GrowthUnderConcurrentDispatch )
 
 	for ( int trial = 0; trial < TRIALS; ++trial )
 	{
-		stellyra::ConcurrentEvent< int > event;
+		stellyra::StandardConcurrentEvent< int > event;
 		std::atomic< uint64_t > fires { 0 };
 
 		std::thread connector( [ & ]() {
@@ -446,7 +446,7 @@ TEST( ConcurrentEventConcurrency, HighVolumeDispatchAccountsForEveryInvocation )
 	constexpr int THREADS = 8;
 	constexpr int TRIGGERS_PER_THREAD = 200000;
 
-	stellyra::ConcurrentEvent< int > event;
+	stellyra::StandardConcurrentEvent< int > event;
 	std::atomic< uint64_t > total { 0 };
 
 	std::vector< stellyra::Connection > handlers;

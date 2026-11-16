@@ -12,9 +12,9 @@
  * BasicEvent (which adds triggering) and RecordableBasicEvent (which adds
  * recording + triggering).
  *
- * Users never name EventStorage directly; they work with Event<Args...>,
- * SharedEvent<Args...>, SingleThreadedEvent<Args...>, or their recordable
- * equivalents.
+ * Users never name EventStorage directly; they work with
+ * RecursiveEvent<Args...>, SharedEvent<Args...>,
+ * SingleThreadedEvent<Args...>, or their recordable equivalents.
  *
  * The connection API is split into three named buckets so that each name
  * has a small, easily-navigated overload set:
@@ -131,10 +131,11 @@ public:
 	 *
 	 * @note This is a convenience method designed to simplify connect call
 	 * sites by eliminating the need to spell out ConnParams with  all
-	 * argument types, using Event<...>::ConnParams (all argument types), or
-	 * decltype(ev)::ConnParams to get an instance.  Callers, instead, can
-	 * use  ev.params(...) at call sites, constructing an instance and
-	 * chaining  methods from that, e.g. `ev.params().prio(5).once()`.
+	 * argument types, using RecursiveEvent<...>::ConnParams (all argument
+	 * types), or decltype(ev)::ConnParams to get an instance.  Callers,
+	 * instead, can use ev.params(...) at call sites, constructing an
+	 * instance and chaining  methods from that, e.g.
+	 * `ev.params().prio(5).once()`.
 	 */
 	static ConnParams params();
 
@@ -144,10 +145,10 @@ public:
 	 *
 	 * @note This is a convenience method designed to simplify connect call
 	 * sites by eliminating the need to spell out ConnParams with  all
-	 * argument types, using Event<...>::ConnParams (all argument types), or
-	 * decltype(ev)::ConnParams to get an instance.  Callers, instead, can
-	 * use  ev.params(...) at call sites, constructing an instance and
-	 * chaining  methods from that, e.g. `ev.params(5).once()`.
+	 * argument types, using RecursiveEvent<...>::ConnParams (all argument
+	 * types), or decltype(ev)::ConnParams to get an instance.  Callers,
+	 * instead, can use ev.params(...) at call sites, constructing an
+	 * instance and chaining  methods from that, e.g. `ev.params(5).once()`.
 	 */
 	static ConnParams params( uint32_t priority );
 
@@ -157,10 +158,11 @@ public:
 	 *
 	 * @note This is a convenience method designed to simplify connect call
 	 * sites by eliminating the need to spell out ConnParams with  all
-	 * argument types, using Event<...>::ConnParams (all argument types), or
-	 * decltype(ev)::ConnParams to get an instance.  Callers, instead, can
-	 * use  ev.params(...) at call sites, constructing an instance and
-	 * chaining  methods from that, e.g. `ev.params(ifPred).prio(5).once()`.
+	 * argument types, using RecursiveEvent<...>::ConnParams (all argument
+	 * types), or decltype(ev)::ConnParams to get an instance.  Callers,
+	 * instead, can use ev.params(...) at call sites, constructing an
+	 * instance and chaining  methods from that, e.g.
+	 * `ev.params(ifPred).prio(5).once()`.
 	 */
 	template<
 		typename Pred,
@@ -193,7 +195,7 @@ public:
 	 * as a member of the owner class:
 	 * @code
 	 * class MyClass : public Trackable {
-	 *     Event< int > onData { this };
+	 *     RecursiveEvent< int > onData { this };
 	 * };
 	 * @endcode
 	 */

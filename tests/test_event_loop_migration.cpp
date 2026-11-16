@@ -52,7 +52,7 @@ template< typename EventT >
 class EventLoopMigration : public ::testing::Test {};
 
 using EventTypes = ::testing::Types<
-	stellyra::Event< int >,
+	stellyra::RecursiveEvent< int >,
 	stellyra::SharedEvent< int >,
 	stellyra::SingleThreadedEvent< int > >;
 TYPED_TEST_SUITE( EventLoopMigration, EventTypes );

@@ -56,7 +56,7 @@ inline void anotherStaticHandler( int, int )
 class TestButton : public stellyra::Trackable
 {
 public:
-	stellyra::Event< int, int > clicked { this };
+	stellyra::RecursiveEvent< int, int > clicked { this };
 
 	void click( int x, int y )
 	{
@@ -148,7 +148,7 @@ public:
 class DataSender : public stellyra::Trackable
 {
 public:
-	stellyra::Event< int > dataReady { this };
+	stellyra::RecursiveEvent< int > dataReady { this };
 
 	void sendData( int value )
 	{
@@ -181,8 +181,8 @@ public:
 class RelayNode : public stellyra::Trackable
 {
 public:
-	stellyra::Event< int > dataIn { this };
-	stellyra::Event< int > dataOut { this };
+	stellyra::RecursiveEvent< int > dataIn { this };
+	stellyra::RecursiveEvent< int > dataOut { this };
 
 	void setupRelay()
 	{

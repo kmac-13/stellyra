@@ -25,7 +25,7 @@ Stellyra is designed to make event-driven programming safe and efficient.  This 
 ```cpp
 class Button : public stellyra::Trackable {
 public:
-	stellyra::Event< int, int > clicked { this };
+	stellyra::RecursiveEvent< int, int > clicked { this };
 };
 
 class Handler : public stellyra::Trackable {
@@ -213,7 +213,7 @@ public:
 ```cpp
 class MultiThreadedManager {
 private:
-	stellyra::Event< int > _event { this };
+	stellyra::RecursiveEvent< int > _event { this };
 	std::vector< std::shared_ptr< Handler > > _handlers;
 
 public:
@@ -245,12 +245,12 @@ public:
 ```cpp
 class Source {
 public:
-	stellyra::Event< int, int > moved { this };
+	stellyra::RecursiveEvent< int, int > moved { this };
 };
 
 class Target {
 public:
-	stellyra::Event< int, int > relayed { this };
+	stellyra::RecursiveEvent< int, int > relayed { this };
 
 	void wire( Source& source ) {
 		relayed.forwardFrom( source );   // same effect as: source.moved.forwardTo( relayed );
@@ -265,9 +265,9 @@ Both directions go through the same underlying mechanism, so they share the same
 The target doesn't need to accept every argument the source emits - it only needs to accept a **positional prefix** of them, first N, in order.  Trailing arguments are dropped:
 
 ```cpp
-stellyra::Event< int, std::string, double > source;
-stellyra::Event< int, std::string >         target;   // first two args of source - OK
-stellyra::Event< int >                      target2;  // first one - also OK
+stellyra::RecursiveEvent< int, std::string, double > source;
+stellyra::RecursiveEvent< int, std::string >         target;   // first two args of source - OK
+stellyra::RecursiveEvent< int >                      target2;  // first one - also OK
 
 source.forwardTo( target );     // target gets (int, string); the double is dropped
 target2.forwardFrom( source );  // target2 gets (int); string and double are dropped
@@ -282,7 +282,7 @@ This is enforced at compile time (a target requesting more arguments, or argumen
 ```cpp
 class Button : public stellyra::Trackable {
 public:
-	stellyra::PrivateEvent< EventFriendTypeList< Button, Setup >, int, int > clicked { this };
+	stellyra::RecursivePrivateEvent< EventFriendTypeList< Button, Setup >, int, int > clicked { this };
 };
 
 class Setup {
@@ -295,9 +295,9 @@ public:
 
 ### Private Events: Single- vs. Multi-Owner
 
-`PrivateEvent<Owner, Args...>` (`PEvent<Owner, Args...>` alias) is the common case: external code can `connect()`, but only `Owner` can trigger it.
+`RecursivePrivateEvent<Owner, Args...>` is the common case: external code can `connect()`, but only `Owner` can trigger it.
 
-`PrivateEvent<EventFriendTypeList<Types...>, Args...>` is the opt-in multi-friend form, for when more than one class legitimately needs trigger access - most often a decoupling `Setup`-style class that wires two otherwise-unrelated owners' events together via `forwardFrom()`, as above.  It needs friend access to the destination event it's wiring into, alongside that event's natural owner.
+`RecursivePrivateEvent<EventFriendTypeList<Types...>, Args...>` is the opt-in multi-friend form, for when more than one class legitimately needs trigger access - most often a decoupling `Setup`-style class that wires two otherwise-unrelated owners' events together via `forwardFrom()`, as above.  It needs friend access to the destination event it's wiring into, alongside that event's natural owner.
 
 ### ⚠️ A Private Event Cannot Be Passed Where a `BasicEvent&` Is Expected
 
@@ -306,7 +306,7 @@ This holds even for the owner itself - it's not just external code that's blocke
 ```cpp
 class Owner {
 public:
-	stellyra::PrivateEvent< Owner, int > sig { this };
+	stellyra::RecursivePrivateEvent< Owner, int > sig { this };
 
 	void tryUpcast() {
 		takesBase( sig );   // compile error, even here, even though Owner is the friend
@@ -316,7 +316,7 @@ public:
 };
 ```
 
-The reason is structural, not an oversight: the actual private inheritance edge (`BasicEvent` as a *private* base) lives on an internal implementation class, not on `PrivateEvent` itself or on whichever outer layer a given friend was granted on.  Friendship granted to `Owner` lets it reach that outer layer's own members - including the forwarding/triggering methods, via ordinary protected-member access through an object of the derived type - but it doesn't reach a private-base conversion rooted two levels further down, because friendship doesn't propagate down an inheritance chain to cover an access check anchored at a different class.  If you need to pass a private event's owner-side authority around, pass the `Owner` (or a method on it) rather than trying to hand out a `BasicEvent&`.
+The reason is structural, not an oversight: the actual private inheritance edge (`BasicEvent` as a *private* base) lives on an internal implementation class, not on `RecursivePrivateEvent` itself or on whichever outer layer a given friend was granted on.  Friendship granted to `Owner` lets it reach that outer layer's own members - including the forwarding/triggering methods, via ordinary protected-member access through an object of the derived type - but it doesn't reach a private-base conversion rooted two levels further down, because friendship doesn't propagate down an inheritance chain to cover an access check anchored at a different class.  If you need to pass a private event's owner-side authority around, pass the `Owner` (or a method on it) rather than trying to hand out a `BasicEvent&`.
 
 ---
 
@@ -674,7 +674,7 @@ void workerThread( stellyra::Connection conn ) {
 ```cpp
 class Producer : public stellyra::Trackable {
 public:
-	stellyra::Event< std::string > dataReady { this };
+	stellyra::RecursiveEvent< std::string > dataReady { this };
 
 	void produce( const std::string& data ) {
 		dataReady( data );
@@ -719,7 +719,7 @@ private:
 	std::vector< std::shared_ptr< Receiver > > _receivers;
 
 public:
-	stellyra::Event< int > event { this };
+	stellyra::RecursiveEvent< int > event { this };
 
 	void addHandler( std::shared_ptr< Receiver > receiver ) {
 		// thread-safe connect
@@ -752,7 +752,7 @@ public:
 ```cpp
 class Sender : public stellyra::Trackable {
 public:
-	stellyra::Event< int > dataReady { this };
+	stellyra::RecursiveEvent< int > dataReady { this };
 };
 
 class Receiver : public stellyra::Trackable {
@@ -761,8 +761,8 @@ public:
 };
 
 // Note: workerThread takes the Sender itself, not a copy of its Event -
-// BasicEvent (what Event<int> aliases) deletes its copy constructor, so
-// std::make_shared<stellyra::Event<int>>(sender->dataReady) does not compile
+// BasicEvent (what RecursiveEvent<int> aliases) deletes its copy constructor, so
+// std::make_shared<stellyra::RecursiveEvent<int>>(sender->dataReady) does not compile
 void workerThread( std::shared_ptr< Sender > sender, int id ) {
 	for ( int i = 0; i < 100; ++i ) {
 		// safe: concurrent emissions on the same, shared Event

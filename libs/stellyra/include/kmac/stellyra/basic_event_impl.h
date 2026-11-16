@@ -50,8 +50,8 @@
 namespace kmac {
 namespace stellyra {
 
-// forward declaration so EventImpl can befriend BasicEvent
-template< typename MutexType, typename... Args > class BasicEvent;
+// forward declaration so EventImpl can befriend GenericEvent
+template< typename MutexType, typename... Args > class GenericEvent;
 
 /**
  * @brief Heap-allocated implementation object for BasicEvent.
@@ -234,8 +234,9 @@ struct BasicEventImpl : EventImplBase
 
 	/**
 	 * @brief Place a new connection in a slot: initialise it in place, wire
-	 * flags, predicate and counts, and bring it into dispatch order (or, when
-	 * a dispatch is in progress, defer ordering to reconcileAfterTrigger).
+	 * flags, predicate and counts, and bring it into dispatch order (or,
+	 * when a dispatch is in progress, defer ordering to
+	 * reconcileAfterTrigger).
 	 *
 	 * @param handler the callable to invoke on dispatch
 	 * @param tag the receiver's migration tag (Trackable::migrationTag()), or
@@ -244,7 +245,8 @@ struct BasicEventImpl : EventImplBase
 	 * @param declaredType the ConnectionType set at connect() time
 	 * @param resolved declaredType already resolved against current loop topology
 	 * @param receiverLoop the tracked receiver's EventLoop, or nullptr
-	 * @param hasOwner true if bound to a receiver/owner object rather than a free function or lambda (see EventFlags::hasOwner())
+	 * @param hasOwner true if bound to a receiver/owner object rather than a free
+	 *   function or lambda (see EventFlags::hasOwner())
 	 * @param isSingleShot true if this connection should auto-disconnect after firing once
 	 * @param hasPredicate true if `predicate` is non-empty and should be attached
 	 * @param predicate the conditional predicate, moved in; ignored if hasPredicate is false
@@ -262,7 +264,8 @@ struct BasicEventImpl : EventImplBase
 	/**
 	 * @brief Trigger the event: dispatch args to every active handler in
 	 * dispatch order (see `order`/priorityConnCount above), each according
-	 * to its own resolved connection type.  Called by BasicEvent::operator().
+	 * to its own resolved connection type.  Called by
+	 * GenericEvent::operator().
 	 *
 	 * Two lock strategies, chosen at compile time via HasLockShared_value:
 	 *   - SharedMutex (SharedEvent): takes a SharedLock, so concurrent
@@ -803,10 +806,10 @@ void BasicEventImpl< MutexType, Args... >::dispatch( Args... args )
 			// least until the posted task is drained regardless of whether
 			// the associated event is still valid or not;
 			// NOTE that the same strong reference requirement is needed for:
-			// - BasicEvent::operator()
+			// - GenericEvent::operator()
 			// - BasicConcurrentEventImpl::dispatch
-			// - BasicConcurrentEvent::operator()
-			// - BasicRecordableEvent::operator()
+			// - GenericConcurrentEvent::operator()
+			// - GenericRecordableEvent::operator()
 			auto self = weakSelf.lock();
 			const uint32_t idx = slot;
 			const uint32_t gen = handlers[ slot ].generation;

@@ -36,7 +36,8 @@ class EventImplBase
 {
 private:
 	/**
-	 * @brief Monotonically increasing process-wide counter for event identity tags.
+	 * @brief Monotonically increasing process-wide counter for event
+	 * identity tags.
 	 */
 	inline static platform::Atomic< uint64_t > _nextId { 0 };
 

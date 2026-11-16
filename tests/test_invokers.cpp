@@ -65,7 +65,7 @@ template< typename EventT >
 class Invokers : public ::testing::Test {};
 
 using EventTypes = ::testing::Types<
-	stellyra::Event< int >,
+	stellyra::RecursiveEvent< int >,
 	stellyra::SharedEvent< int > >;
 TYPED_TEST_SUITE( Invokers, EventTypes );
 

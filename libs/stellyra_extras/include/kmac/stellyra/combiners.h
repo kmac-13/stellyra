@@ -1,9 +1,10 @@
+#pragma once
 #ifndef KMAC_STELLYRA_COMBINERS_H
 #define KMAC_STELLYRA_COMBINERS_H
 
 /**
  * @file combiners.h
- * @brief Standard combiner functors for use with CombiningEvent.
+ * @brief Standard combiner functors for use with BasicCombiningEvent.
  *
  * A combiner is a callable that accepts a pair of iterators over a range of
  * return values collected from all connected handlers, and produces a single
@@ -14,9 +15,9 @@
  * ReturnType operator()(Iter first, Iter last) const;
  * @endcode
  *
- * Usage with CombiningEvent:
+ * Usage with BasicCombiningEvent:
  * @code
- * CombiningEvent<bool, Combiners::LogicalAnd<>, std::string> validate{this};
+ * BasicCombiningEvent<Combiners::LogicalAnd<>, bool, std::string> validate{this};
  * validate.connect(checker1, &Checker::check);
  * validate.connect(checker2, &Checker::check);
  * bool allOk = validate("input");   // true only if every handler returns true
@@ -184,10 +185,10 @@ struct CountTrue
  * @brief Returns only the first handler's return value.
  *
  * Useful when only one handler's result should matter and the rest exist
- * purely as observers.  "First" means connection order (CombiningEvent has
- * no priority mechanism) - the order handlers were connected in, regardless
- * of which underlying storage slot each one currently occupies.  Returns
- * T{} for an empty range.
+ * purely as observers.  "First" means connection order (GenericCombiningEvent
+ * has no priority mechanism) - the order handlers were connected in,
+ * regardless of which underlying storage slot each one currently occupies.
+ * Returns T{} for an empty range.
  */
 template< typename T >
 struct First

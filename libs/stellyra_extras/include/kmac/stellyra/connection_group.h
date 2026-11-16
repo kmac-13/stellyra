@@ -4,7 +4,8 @@
 
 /**
  * @file connection_group.h
- * @brief Manages a collection of connections that can be disconnected as a unit.
+ * @brief Manages a collection of connections that can be disconnected as a
+ * unit.
  *
  * Useful when an object holds connections that need to be torn down and
  * rebuilt during its lifetime - for example, when swapping a model, changing
@@ -53,7 +54,8 @@ public:
 	ConnectionGroup() = default;
 
 	/**
-	 * @brief Move constructor, transfers all connections without disconnecting.
+	 * @brief Move constructor, transfers all connections without
+	 * disconnecting.
 	 */
 	ConnectionGroup( ConnectionGroup&& other ) noexcept;
 
@@ -92,7 +94,8 @@ public:
 	bool empty() const;
 
 	/**
-	 * @brief Returns true if at least one connection in the group is still active.
+	 * @brief Returns true if at least one connection in the group is still
+	 * active.
 	 */
 	bool hasActiveConnections() const;
 

@@ -26,7 +26,7 @@
  * manual wiring is only required when using EventRecorder standalone.
  *
  * @code
- * RecordableEvent< float > reading { this };
+ * RecursiveRecordableEvent< float > reading { this };
  *
  * reading.recorder().startRecording( 100 );   // keep last 100 emissions
  * // ... run sensor for a while ...
@@ -134,7 +134,8 @@ public:
 	// =========================================================================
 
 	/**
-	 * @brief Returns true if recording is currently active (not paused or stopped).
+	 * @brief Returns true if recording is currently active (not paused or
+	 * stopped).
 	 */
 	bool isRecording() const;
 
@@ -174,8 +175,8 @@ public:
 	/**
 	 * @brief Stop recording.
 	 *
-	 * Existing recordings are retained and can still be replayed or exported.
-	 * Call clearRecordings() to discard them.
+	 * Existing recordings are retained and can still be replayed or
+	 * exported.  Call clearRecordings() to discard them.
 	 */
 	void stopRecording();
 

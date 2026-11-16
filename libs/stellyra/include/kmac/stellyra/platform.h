@@ -14,8 +14,8 @@
  * @section configuration Configuration
  *
  * Thread safety is **enabled by default**.  To disable it, define
- * `STELLYRA_THREAD_SAFE=0` before including any Stellyra header (typically via
- * a compiler flag or CMakeLists.txt):
+ * `STELLYRA_THREAD_SAFE=0` before including any Stellyra header (typically
+ * via a compiler flag or CMakeLists.txt):
  *
  * ```cmake
  * # CMakeLists.txt
@@ -38,7 +38,8 @@
  *
  * - **platform::Mutex** - used where a plain exclusive mutex suffices:
  *   Trackable::_mutex and EventLoop::_pendingMutex (both in Stellyra Core);
- *   CombiningEvent::mutex and ConnectionGuard::_mutex (both in stellyra_extras)
+ *   CombiningEvent::mutex and ConnectionGuard::_mutex (both in
+ *   stellyra_extras)
  *
  * - **platform::SharedMutex** - used where concurrent reads are beneficial:
  *   EventImpl::mutex when MutexType is SharedMutex (i.e. SharedEvent) -
@@ -116,11 +117,13 @@ using Mutex = std::mutex;
 using RecursiveMutex = std::recursive_mutex;
 
 /**
- * @brief Shared/exclusive mutex - satisfies the `SharedMutex` named requirement.
+ * @brief Shared/exclusive mutex - satisfies the `SharedMutex` named
+ * requirement.
  *
- * Maps to `std::shared_mutex` when `STELLYRA_THREAD_SAFE` is set (the default).
- * Allows concurrent shared locks (e.g. multiple simultaneous emissions) while
- * still providing exclusive locks for writes (connect/disconnect).
+ * Maps to `std::shared_mutex` when `STELLYRA_THREAD_SAFE` is set (the
+ * default).  Allows concurrent shared locks (e.g. multiple simultaneous
+ * emissions) while still providing exclusive locks for writes (connect/
+ * disconnect).
  */
 using SharedMutex = std::shared_mutex;
 
@@ -162,7 +165,8 @@ template< typename T >
 using SharedPtr = std::shared_ptr< T >;
 
 /**
- * @brief Weak reference to a SharedPtr-managed object - aliases `std::weak_ptr<T>`.
+ * @brief Weak reference to a SharedPtr-managed object - aliases
+ * `std::weak_ptr<T>`.
  */
 template< typename T >
 using WeakPtr = std::weak_ptr< T >;
@@ -449,7 +453,8 @@ template< typename T >
 using SharedPtr = std::shared_ptr< T >;
 
 /**
- * @brief Weak reference to a SharedPtr-managed object - aliases `std::weak_ptr<T>`.
+ * @brief Weak reference to a SharedPtr-managed object - aliases
+ * `std::weak_ptr<T>`.
  */
 template< typename T >
 using WeakPtr = std::weak_ptr< T >;

@@ -120,7 +120,7 @@ class DeferredTeardownOrderTest : public ::testing::Test
 
 // see integration note 3 above - replace with the project's existing
 // thread-safe type alias if one already covers Event + SharedEvent
-using DeferredTeardownOrderEventTypes = ::testing::Types< stellyra::Event< int >, stellyra::SharedEvent< int > >;
+using DeferredTeardownOrderEventTypes = ::testing::Types< stellyra::RecursiveEvent< int >, stellyra::SharedEvent< int > >;
 
 TYPED_TEST_SUITE( DeferredTeardownOrderTest, DeferredTeardownOrderEventTypes );
 
@@ -199,7 +199,7 @@ TYPED_TEST( DeferredTeardownOrderTest, SurvivesReceiverDestroyedBeforeDrainer )
 
 TEST( EagerDisconnectorTest, DisconnectsBeforeWrappedDestructorRuns )
 {
-	stellyra::Event< int > event;
+	stellyra::RecursiveEvent< int > event;
 
 	struct Receiver_impl : stellyra::Trackable
 	{
@@ -222,7 +222,7 @@ TEST( EagerDisconnectorTest, DisconnectsBeforeWrappedDestructorRuns )
 
 TEST( EagerDisconnectorTest, DisconnectsEvenWhenDeletedThroughBasePointer )
 {
-	stellyra::Event< int > event;
+	stellyra::RecursiveEvent< int > event;
 
 	struct Receiver_impl : stellyra::Trackable
 	{

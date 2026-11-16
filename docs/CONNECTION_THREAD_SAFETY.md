@@ -11,7 +11,7 @@ Stellyra has two distinct thread safety guarantees that must not be confused:
 **Event operations are fully thread-safe:**
 - `event.connect()` - any thread
 - `event.disconnect( receiver )` - any thread
-- `event( args )` / `event.trigger( args )` / `event.emit( args )` - any thread; genuinely concurrent dispatch is only guaranteed for `SharedEvent` (shared-locked, so concurrent triggers run in parallel against each other but block against connect/disconnect) and `ConcurrentEvent` (lock-free - dispatch never takes a lock at all); `Event`'s default `RecursiveMutex` serializes concurrent triggers rather than running them in parallel, and `SingleThreadedEvent` provides no synchronization at all and requires single-threaded use
+- `event( args )` / `event.trigger( args )` / `event.emit( args )` - any thread; genuinely concurrent dispatch is only guaranteed for `SharedEvent` (shared-locked, so concurrent triggers run in parallel against each other but block against connect/disconnect) and `ConcurrentEvent` (lock-free - dispatch never takes a lock at all); `RecursiveEvent`'s default `RecursiveMutex` serializes concurrent triggers rather than running them in parallel, and `SingleThreadedEvent` provides no synchronization at all and requires single-threaded use
 
 **Connection is not thread-safe against concurrent reassignment:**
 - `conn.disconnect()`, `conn.block()`, `conn.isConnected()`, etc. may be called concurrently from different threads on the same instance without restriction - each forwards into the shared, already-locked `EventImplBase`
