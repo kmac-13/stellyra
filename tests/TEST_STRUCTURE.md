@@ -7,7 +7,7 @@
 | `test_helpers.hpp` | - | Shared helpers: `TestButton`, `TestHandler`, `TestValidator`, `DataSender`, `DataReceiver`, `RelayNode`, `Checker`, static free function handlers |
 | `test_basic_connections.cpp` | 8 | Basic connections, lambdas, manual and auto-disconnect, disconnect by receiver |
 | `test_advanced_connections.cpp` | 8 | Single-shot, priority ordering, FIFO for equal priority, conditional connections, blocking |
-| `test_combining_and_groups.cpp` | 7 | `CombiningEvent` (LogicalAnd, LogicalOr), `ScopedConnection`, `ConnectionGroup` (block/unblock/disconnect) |
+| `test_combining_and_groups.cpp` | 7 | `BasicCombiningEvent` (LogicalAnd, LogicalOr), `ScopedConnection`, `ConnectionGroup` (block/unblock/disconnect) |
 | `test_free_functions.cpp` | 8 | Free functions, static functions, `connectFree`/`connectOnceFree`, disconnect by pointer, mixed connection types |
 | `test_event_loops.cpp` | 6 | Deferred connections, connection info inspection, loop migration, manual `processEvents`, multiple loops |
 | `test_external_event_loop.cpp` | 7 | Manually-processed `EventLoop`: deferred-until-drained, same-loop Direct resolution, multi-event drain, migration preserving pending events, `start`/`stop` no-ops |

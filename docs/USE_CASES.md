@@ -111,7 +111,7 @@ Industrial automation, autonomous vehicles, drone software, lab equipment, and m
 
 Hardware controllers like a `MotorController` require exactly one execution context.  Stellyra's sender thread affinity guarantees that critical commands like `MoveCommand` and `EmergencyStop` are serialised through the object's EventLoop, avoiding race conditions without manual locking boilerplate.
 
-For a detailed architectural pattern covering differential (change-driven) machine control, desktop simulation portability, and hardware fault reproduction via `RecordableEvent`, see [`USE_CASE_DIFFERENTIAL_MACHINE_CONTROL.md`](USE_CASE_DIFFERENTIAL_MACHINE_CONTROL.md).
+For a detailed architectural pattern covering differential (change-driven) machine control, desktop simulation portability, and hardware fault reproduction via `RecursiveRecordableEvent`, see [`USE_CASE_DIFFERENTIAL_MACHINE_CONTROL.md`](USE_CASE_DIFFERENTIAL_MACHINE_CONTROL.md).
 
 ### Hardware-in-the-Loop (HIL) Testing
 

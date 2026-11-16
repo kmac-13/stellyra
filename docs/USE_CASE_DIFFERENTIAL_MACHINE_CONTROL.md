@@ -98,11 +98,11 @@ The Stellyra event connections, state machines, and control logic are identical 
 
 ## Recording, Replay, and Fault Reproduction
 
-Stellyra's `RecordableEvent` and `EventInspector` capabilities integrate naturally with this architecture to address one of the hardest problems in machine control: reproducing a field failure deterministically off-target.
+Stellyra's `RecursiveRecordableEvent` and `EventInspector` capabilities integrate naturally with this architecture to address one of the hardest problems in machine control: reproducing a field failure deterministically off-target.
 
 ### Recording a Hardware Run
 
-Replace the plain `Event` members on sensor objects with `RecordableEvent`:
+Replace the plain `RecursiveEvent` members on sensor objects with `RecursiveRecordableEvent`:
 
 ```cpp
 class TemperatureSensor : public stellyra::Trackable
@@ -167,7 +167,7 @@ This is particularly useful during system integration, when confirming that all 
 
 ### Performance Statistics
 
-`RecordableEvent` can track emission counts and average timing per sensor channel:
+`RecursiveRecordableEvent` can track emission counts and average timing per sensor channel:
 
 ```cpp
 sensor.temperatureChanged.enableStatistics();
@@ -185,8 +185,8 @@ This gives a data-driven basis for the worst-case tick budget calculation descri
 
 ## Constraints and Cautions
 
-**Budget for worst-case load.**  Because work is event-driven, developers must calculate the system's worst-case tick - the scenario where all inputs change simultaneously (e.g. an emergency stop).  The total execution time of all cascading events across all three loops under maximum load must fit comfortably within the tick window.  Use `RecordableEvent` performance statistics during commissioning to measure actual handler execution times and validate the budget.
+**Budget for worst-case load.**  Because work is event-driven, developers must calculate the system's worst-case tick - the scenario where all inputs change simultaneously (e.g. an emergency stop).  The total execution time of all cascading events across all three loops under maximum load must fit comfortably within the tick window.  Use `RecursiveRecordableEvent` performance statistics during commissioning to measure actual handler execution times and validate the budget.
 
 **Coalesce redundant events where possible.**  If multiple interrelated sensor changes would trigger the same downstream calculation, consider deduplicating them before Loop 2 processes them.  Running the same heavy computation multiple times within a single tick wastes the efficiency gains the pattern is designed to provide.
 
-**No blocking I/O in handlers.**  Because execution is single-threaded, a single blocking call (slow disk write, synchronous network log, etc.) in any handler will stall the entire thread and cause the system to miss its next tick.  Long-running operations must be offloaded outside the core pipeline.  `RecordableEvent` CSV export should happen outside the tick window - for example, on a dedicated logging thread or after the machine has stopped.
+**No blocking I/O in handlers.**  Because execution is single-threaded, a single blocking call (slow disk write, synchronous network log, etc.) in any handler will stall the entire thread and cause the system to miss its next tick.  Long-running operations must be offloaded outside the core pipeline.  `RecursiveRecordableEvent` CSV export should happen outside the tick window - for example, on a dedicated logging thread or after the machine has stopped.

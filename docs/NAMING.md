@@ -55,7 +55,7 @@ The library uses a few different naming conventions for the same two roles. Stel
 
 ```cpp
 stellyra::RecursiveEvent<int> onReading;
-stellyra::Signal<int> onReadingAlias;  // Signal is an alias for Event
+stellyra::RecursiveSignal<int> onReadingAlias;  // RecursiveSignal is an alias for RecursiveEvent
 
 onReading.connect(handler, Handler::method);
 onReading.trigger(42);  // one pluck, every tuned string responds

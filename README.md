@@ -30,7 +30,7 @@ add_subdirectory( stellyra )
 # core only
 target_link_libraries( your_target PRIVATE Stellyra::Stellyra )
 
-# core + extras (CombiningEvent, EventInspector, RecordableEvent, etc.)
+# core + extras (BasicCombiningEvent, EventInspector, RecursiveRecordableEvent, etc.)
 target_link_libraries( your_target PRIVATE Stellyra::Extras )
 ```
 
@@ -74,7 +74,7 @@ For a receiver that could be destroyed while dispatch is concurrently in flight,
 
 Classes that cannot or should not modify their inheritance hierarchy can embed `stellyra::Trackable` (aliased as `stellyra::Anchor`) as a member instead.
 
-**Sender** - embed `stellyra::Trackable` and pass its address to the Event constructor:
+**Sender** - embed `stellyra::Trackable` and pass its address to the event's constructor:
 
 ```cpp
 class NetworkManager  // no inheritance required
@@ -133,10 +133,10 @@ public:
 ### Core Event System
 - **Type-safe events** - compile-time signature checking; no runtime type errors
 - **Multiple handlers** - any number of handlers per event, in any combination of member functions, lambdas, and free functions
-- **Per-instance thread-safety strategy** - choose the mutex strategy per event via a type alias: `Event` (recursive mutex), `SharedEvent` (shared mutex, concurrent dispatch), or `SingleThreadedEvent` (zero-overhead no-op mutex)
+- **Per-instance thread-safety strategy** - choose the mutex strategy per event via a type alias: `RecursiveEvent` (recursive mutex), `SharedEvent` (shared mutex, concurrent dispatch), or `SingleThreadedEvent` (zero-overhead no-op mutex)
 - **Pluggable mutex type** - those three aliases cover the common cases, but `BasicEvent<MutexType, Args...>` accepts any type satisfying the standard `Lockable`/`SharedLockable` requirements, so a custom mutex can be supplied directly - `stellyra_extras/mutex_types.h`'s experimental `FastRecursiveMutex`/`SpinRecursiveMutex` are exactly this, provided for benchmarking a given toolchain against `std::recursive_mutex`
 - **Three trigger syntaxes** - `event(args)`, `event.trigger(args)`, `event.emit(args)` - all equivalent
-- **Function-style signatures** - `RecursiveEvent<void(int, std::string)>` is an alternative, equivalent variation of `RecursiveEvent<int, std::string>` (likewise for `SharedEvent`/`SingleThreadedEvent`), and applies across all event families, including `*ConcurrentEvent`, `*RecordableEvent`, `*PrivateEvent`, and `*CombiningEvent` (with `CombiningEvent` the only one supporting non-void return type); parameter names in the function type (e.g. `RecursiveEvent<void(int employeeId, std::string newTitle)>`) are accepted too, purely as documentation; `BasicEvent<MutexType, void(Args...)>` works directly, too, for custom `MutexType`'s that the library's aliases don't cover
+- **Function-style signatures** - `RecursiveEvent<void(int, std::string)>` is an alternative, equivalent variation of `RecursiveEvent<int, std::string>` (likewise for `SharedEvent`/`SingleThreadedEvent`), and applies across all event families, including `*ConcurrentEvent`, `*RecordableEvent`, `*PrivateEvent`, and `*CombiningEvent` (with `BasicCombiningEvent` the only one supporting non-void return type); parameter names in the function type (e.g. `RecursiveEvent<void(int employeeId, std::string newTitle)>`) are accepted too, purely as documentation; `BasicEvent<MutexType, void(Args...)>` works directly, too, for custom `MutexType`'s that the library's aliases don't cover
 - **Automatic lifetime management** - connections disconnect automatically when sender or receiver is destroyed; no dangling calls
 - **Partial argument matching** - a member function handler can omit trailing arguments it doesn't need; trailing args are silently dropped at compile time with no runtime cost
 
@@ -186,9 +186,9 @@ public:
 - **Observer pattern** - decouple data models from their views
 - **Producer-consumer** - worker threads posting results back to a UI or coordinator thread via Deferred connections
 - **Event-driven state machines** - state enter/exit notifications with priority-ordered handlers
-- **Validation pipelines** - `CombiningEvent` with `LogicalAnd` to require all validators to pass
-- **Plugin / extension systems** - `PrivateEvent` exposes connection points without exposing trigger authority
-- **Testing and debugging** - `RecordableEvent` records emission sequences for replay in unit tests or bug reproduction
+- **Validation pipelines** - `BasicCombiningEvent` with `LogicalAnd` to require all validators to pass
+- **Plugin / extension systems** - `RecursivePrivateEvent` exposes connection points without exposing trigger authority
+- **Testing and debugging** - `RecursiveRecordableEvent` records emission sequences for replay in unit tests or bug reproduction
 - **Embedded / RTOS systems** - `STELLYRA_THREAD_SAFE=0` + manual `EventLoop` for bare-metal targets
 
 ---

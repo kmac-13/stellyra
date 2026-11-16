@@ -316,7 +316,7 @@ public:
 };
 ```
 
-The reason is structural, not an oversight: the actual private inheritance edge (`BasicEvent` as a *private* base) lives on an internal implementation class, not on `PrivateEvent` itself or on whichever outer layer a given friend was granted on.  Friendship granted to `Owner` lets it reach that outer layer's own members - including the forwarding/triggering methods, via ordinary protected-member access through an object of the derived type - but it doesn't reach a private-base conversion rooted two levels further down, because friendship doesn't propagate down an inheritance chain to cover an access check anchored at a different class.  If you need to pass a private event's owner-side authority around, pass the `Owner` (or a method on it) rather than trying to hand out a `BasicEvent&`.
+The reason is structural, not an oversight: the actual private inheritance edge (`BasicEvent` as a *private* base) lives on an internal implementation class, not on `RecursivePrivateEvent` itself or on whichever outer layer a given friend was granted on.  Friendship granted to `Owner` lets it reach that outer layer's own members - including the forwarding/triggering methods, via ordinary protected-member access through an object of the derived type - but it doesn't reach a private-base conversion rooted two levels further down, because friendship doesn't propagate down an inheritance chain to cover an access check anchored at a different class.  If you need to pass a private event's owner-side authority around, pass the `Owner` (or a method on it) rather than trying to hand out a `BasicEvent&`.
 
 ---
 

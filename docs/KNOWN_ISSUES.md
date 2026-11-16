@@ -139,7 +139,7 @@ These are current, intentional constraints of the design - not bugs - worth know
   `RecursiveEvent`'s default recursive mutex allows a handler to legitimately connect, disconnect, or re-trigger the same event from within its own invocation; `SharedEvent`'s shared mutex does not support this, and doing it anyway can deadlock.
 - **Single-shot connections (`ConnParams::once()`) are unavailable on `SharedEvent`.**
   Enforced by a `static_assert` at the call site: a single-shot handler disconnecting itself while a shared lock is held would deadlock for the same reason as above.
-- **`CombiningEvent` is Direct-only and non-reentrant.**
+- **`BasicCombiningEvent` is Direct-only and non-reentrant.**
   There is no Deferred variant (the combined return value must be available synchronously), and its internal mutex is a plain, non-recursive mutex - connecting, disconnecting, or re-triggering from inside a connected handler will deadlock.
 - **Predicates require exact-arity matching.**
   Unlike handlers (which support partial-argument matching via `createPartial`), a predicate passed to `ConnParams`/`.when()` must accept the event's full `Args...` list; there is no partial-predicate path, NTTP or otherwise.
@@ -164,10 +164,10 @@ These are current, intentional constraints of the design - not bugs - worth know
 
 ## Library structure notes
 
-### `CombiningEvent` and other extras live in `stellyra_extras`, not the core library
+### `BasicCombiningEvent` and other extras live in `stellyra_extras`, not the core library
 
-`CombiningEvent` (return-value collection/combining across handlers), `EventRecorder`/`BasicRecordableEvent`, `ConnectionGroup`, and the optional mutex types all live in `libs/stellyra_extras/`, not `libs/stellyra/`.  **Lesson for future documentation or comparison work on this project:** "does Stellyra have X" needs checking against `stellyra_extras` as well as the core library - several real features live there by design, not as an oversight, and a check that only looks in `libs/stellyra/` will report a false negative.
+`BasicCombiningEvent` (return-value collection/combining across handlers), `EventRecorder`/`BasicRecordableEvent`, `ConnectionGroup`, and the optional mutex types all live in `libs/stellyra_extras/`, not `libs/stellyra/`.  **Lesson for future documentation or comparison work on this project:** "does Stellyra have X" needs checking against `stellyra_extras` as well as the core library - several real features live there by design, not as an oversight, and a check that only looks in `libs/stellyra/` will report a false negative.
 
 ### `stellyra_extras/mutex_types.h` - `FastRecursiveMutex` and `SpinRecursiveMutex`
 
-Both are experimental, atomic-owner-plus-depth-counter reentrant mutex types, not used by any shipped `Event` alias - provided so a given toolchain/target can be benchmarked against `std::recursive_mutex`.  `SpinRecursiveMutex`spins (bounded pure-spin, then yields) instead of falling back to a blocking `std::mutex`.  Both are verified under a single-threaded reentrancy test and a multi-thread/high-emission-count stress test (clean under ThreadSanitizer, Linux/libstdc++); neither has had long-duration soak testing or testing on Windows/MinGW at time of writing.
+Both are experimental, atomic-owner-plus-depth-counter reentrant mutex types, not used by any shipped event alias - provided so a given toolchain/target can be benchmarked against `std::recursive_mutex`.  `SpinRecursiveMutex`spins (bounded pure-spin, then yields) instead of falling back to a blocking `std::mutex`.  Both are verified under a single-threaded reentrancy test and a multi-thread/high-emission-count stress test (clean under ThreadSanitizer, Linux/libstdc++); neither has had long-duration soak testing or testing on Windows/MinGW at time of writing.

@@ -15,14 +15,14 @@
 * **event loops (`EventLoop`/`AutoDrainThread`)** - thread-safe task queue, drained manually or by a dedicated background thread
 * **sender thread affinity** - triggers from other threads automatically deferred to protect sender state without a hand-written mutex
 * **event loop migration** - move an object, and its pending events, to a different EventLoop at runtime
-* **serialized or concurrent events** - a std::shared_mutex-backed event (`SharedEvent`) or a lock-free, `EpochDomain`-backed alternative (`ConcurrentEvent`) for genuinely concurrent dispatch from multiple threads at once, rather than one thread at a time behind an exclusive lock (`Event`)
+* **serialized or concurrent events** - a std::shared_mutex-backed event (`SharedEvent`) or a lock-free, `EpochDomain`-backed alternative (`ConcurrentEvent`) for genuinely concurrent dispatch from multiple threads at once, rather than one thread at a time behind an exclusive lock (`RecursiveEvent`)
 * **properties (`Property`/`ReadOnlyProperty`/`ComputedProperty`/`ConstProperty`)** - reactive value wrappers with a built-in `changed` event, for values that are read-only externally, computed from another value, or immutable
 * **scoped connections (`ScopedConnection`)** - RAII auto-disconnect
 * **blocking and RAII block guard** - temporarily disable a single connection (`block()`/`unblock()`), or pause an entire event for a scope via the RAII `BlockGuard` wrapper
 * **connection grouping (`ConnectionGroup`)** - manage multiple connections as a single disconnect-together unit
-* **result aggregation (`CombiningEvent` + combiners)** - aggregate handler return values (`LogicalAnd`/`Or`, `Sum`, `Average`, `Product`, `Maximum`/`Minimum`, `First`/`Last`, `CountTrue`, etc.)
+* **result aggregation (`BasicCombiningEvent` + combiners)** - aggregate handler return values (`LogicalAnd`/`Or`, `Sum`, `Average`, `Product`, `Maximum`/`Minimum`, `First`/`Last`, `CountTrue`, etc.)
 * **restricted triggering (`RecursivePrivateEvent`)** - restrict triggering to the owning/friend class while still allowing external connections
-* **recording/playback (`RecordableEvent`)** - record emissions with timestamps; replay them at original, scaled, or immediate speed; timing statistics and CSV export
+* **recording/playback (`RecursiveRecordableEvent`)** - record emissions with timestamps; replay them at original, scaled, or immediate speed; timing statistics and CSV export
 * **introspection (`EventInspector`)** - read-only inspection of an event's live connections, for debugging
 * **event forwarding (`forwardTo`, `forwardFrom`)** - relay one event's emissions into another
 * **bare-metal/zero-overhead mode (`STELLYRA_THREAD_SAFE`)** - library-wide compile switch for bare-metal/single-threaded builds, removing mutex/atomic overhead entirely
@@ -44,7 +44,7 @@ Events notify multiple handlers when triggered.  Connections automatically clean
 stellyra::ConcurrentEvent< int > sensorReading { this };
 stellyra::SingleThreadedConcurrentEvent< int > sensorReadingST { this };  // same model, no atomics
 ```
-`SharedEvent` already supports genuinely concurrent dispatch from multiple threads via a shared lock on a `std::shared_mutex` - unlike `Event`'s plain recursive mutex, which serializes dispatch to one thread at a time.  `ConcurrentEvent` (in extras) goes further: its dispatch path never touches a mutex at all, relying entirely on a lock-free `EpochDomain` instead, so it avoids both the shared lock's acquisition overhead and the blocking that happens when `connect()`/`disconnect()` hold `SharedEvent`'s exclusive lock while a dispatch is in flight.  That lock-free benefit also disappears once the event is given an owner `EventLoop` - see the FAQ entry "Does SharedEvent or ConcurrentEvent still dispatch concurrently if it has an owner EventLoop?" for why.
+`SharedEvent` already supports genuinely concurrent dispatch from multiple threads via a shared lock on a `std::shared_mutex` - unlike `RecursiveEvent`'s plain recursive mutex, which serializes dispatch to one thread at a time.  `ConcurrentEvent` (in extras) goes further: its dispatch path never touches a mutex at all, relying entirely on a lock-free `EpochDomain` instead, so it avoids both the shared lock's acquisition overhead and the blocking that happens when `connect()`/`disconnect()` hold `SharedEvent`'s exclusive lock while a dispatch is in flight.  That lock-free benefit also disappears once the event is given an owner `EventLoop` - see the FAQ entry "Does SharedEvent or ConcurrentEvent still dispatch concurrently if it has an owner EventLoop?" for why.
 
 ### Trackable Class
 **Foundation for lifetime management**
@@ -217,10 +217,10 @@ Convenient for managing related connections, especially in destructors.
 
 ## Return Value Handling
 
-### CombiningEvent
+### BasicCombiningEvent
 **Aggregate return values from all handlers**
 ```cpp
-stellyra::CombiningEvent< bool, stellyra::Combiners::LogicalAnd<>, int > validate { this };
+stellyra::BasicCombiningEvent< stellyra::Combiners::LogicalAnd<>, bool, int > validate { this };
 ```
 Collects return values from handlers and combines them with specified logic.
 
@@ -240,7 +240,7 @@ Collects return values from handlers and combines them with specified logic.
 
 ## Encapsulation
 
-### PrivateEvent
+### RecursivePrivateEvent
 **Restrict event triggering to friend class**
 ```cpp
 class Button : public stellyra::Trackable {
@@ -265,12 +265,12 @@ A small family of reactive wrappers - `Property<T>` (readable and writable by an
 
 ## Event Recording and Replay
 
-### RecordableEvent
+### RecursiveRecordableEvent
 **Event with built-in recording and statistics**
 ```cpp
 stellyra::RecursiveRecordableEvent< int > event { this };
 ```
-Extended Event that can record emissions and provide performance statistics.  Use for debugging/testing; use base Event for production.
+Extended event that can record emissions and provide performance statistics.  Use for debugging/testing; use plain `RecursiveEvent` for production.
 
 ### Start/Stop Recording
 **Capture event triggers with timestamps**
@@ -410,7 +410,7 @@ All three do the same thing.  Choose your preferred style.
 **Relay emissions to another event**
 ```cpp
 event1.forwardTo( event2 );    // event1 emissions trigger event2
-event2.forwardFrom( event1 );  // event1 emissions trigger event2 for cases where event2 is a PrivateEvent
+event2.forwardFrom( event1 );  // event1 emissions trigger event2 for cases where event2 is a PrivateEvent-family event
 ```
 Chain events together.  Useful for proxy patterns.
 
@@ -443,7 +443,7 @@ All supported without `std::function` overhead.
 # Disable for single-threaded / bare-metal targets
 target_compile_definitions( app PRIVATE STELLYRA_THREAD_SAFE=0 )
 ```
-When enabled (the default), all internal mutexes use `std::mutex`, `std::recursive_mutex`, or `std::shared_mutex` depending on the type (`Trackable` and `EventLoop` use a plain mutex; the default `Event` alias uses a recursive mutex; `SharedEvent` uses a shared mutex for concurrent reads).  When disabled, they resolve to zero-overhead no-op stubs and `<mutex>` / `<shared_mutex>` are not included, allowing compilation on bare-metal targets where those headers are unavailable.  Affects `Event`, `Trackable`, `EventLoop`, `CombiningEvent`, and `ConnectionGuard` uniformly - it controls whether the whole library compiles with real synchronization primitives at all, not which per-event locking strategy is chosen (that is a separate, per-instance choice - see `BasicEvent<MutexType, Args...>` and its `Event`/`SharedEvent`/`SingleThreadedEvent` aliases).
+When enabled (the default), all internal mutexes use `std::mutex`, `std::recursive_mutex`, or `std::shared_mutex` depending on the type (`Trackable` and `EventLoop` use a plain mutex; the default `RecursiveEvent` alias uses a recursive mutex; `SharedEvent` uses a shared mutex for concurrent reads).  When disabled, they resolve to zero-overhead no-op stubs and `<mutex>` / `<shared_mutex>` are not included, allowing compilation on bare-metal targets where those headers are unavailable.  Affects `RecursiveEvent`, `Trackable`, `EventLoop`, `BasicCombiningEvent`, and `ConnectionGuard` uniformly - it controls whether the whole library compiles with real synchronization primitives at all, not which per-event locking strategy is chosen (that is a separate, per-instance choice - see `BasicEvent<MutexType, Args...>` and its `RecursiveEvent`/`SharedEvent`/`SingleThreadedEvent` aliases).
 
 ### platform::Mutex / platform::SharedMutex
 **Portable mutex types used internally**

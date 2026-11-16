@@ -29,12 +29,12 @@ Removing `Q_OBJECT` removes all of these at once, with no partial version - ther
 Applies when a class must keep `Q_OBJECT` for `Q_INVOKABLE`, QML registration, or property bindings, but has other, purely-internal signals that aren't exposed to any of that.
 
 - `Q_OBJECT`, `Q_PROPERTY`, `Q_INVOKABLE`, and QML registration macros all stay untouched
-- only signals with no `Q_PROPERTY NOTIFY` reference and no QML/scripting exposure are candidates to replace with Stellyra `Event`s
-- the class ends up with both Qt signals (for QML/property/invokable needs) and Stellyra `Event`s (for internal communication) side by side - `Q_GADGET` classes fall into this same bucket by default, since they have no signals/slots to migrate at all, but can freely add Stellyra `Event`s for anything that isn't property/QML-driven
+- only signals with no `Q_PROPERTY NOTIFY` reference and no QML/scripting exposure are candidates to replace with Stellyra events
+- the class ends up with both Qt signals (for QML/property/invokable needs) and Stellyra events (for internal communication) side by side - `Q_GADGET` classes fall into this same bucket by default, since they have no signals/slots to migrate at all, but can freely add Stellyra events for anything that isn't property/QML-driven
 
 ### Sender - non-invasive option
 
-Instead of inheriting `stellyra::Trackable`, embed it as a member and pass its address to the Event constructor:
+Instead of inheriting `stellyra::Trackable`, embed it as a member and pass its address to the event's constructor:
 
 ```cpp
 // Qt style
@@ -78,7 +78,7 @@ Qt's `AutoConnection` compares the **emitting thread** against the receiver's th
 ### Features gained
 
 - event recording and replay
-- return value aggregation (CombiningEvent)
+- return value aggregation (BasicCombiningEvent)
 - conditional connections (via `ConnParams`/`.when()`)
 - single-shot connections
 - priority ordering
@@ -413,7 +413,7 @@ event( 42 );
 - emission abort - a rocket slot can call `rocket::abort_emission()` to stop the emission mid-flight, preventing any later-registered slot from running. Stellyra has no equivalent: a handler cannot halt dispatch to the remaining connections on the same trigger
 - `current_connection()` access - a rocket slot can inspect or disconnect its own connection from inside its own body; Stellyra has no equivalent built-in access to "my own `Connection`" from within a handler
 - built-in timers - rocket's `set_interval()`/`set_timeout()` schedule periodic or one-shot callbacks on the current thread's dispatch queue, but like connection blocking above, this feature is disabled by default in the shipped header (`ROCKET_NO_TIMERS`) with no supported opt-in - using it means maintaining a hand-patched fork of `rocket.hpp`, not consuming it as-is; Stellyra has no timer/scheduling facility either way - this needs an external mechanism (a thread, a platform timer API, etc.) if you rely on it
-- call-time combiner override - rocket lets you override the combiner policy per call, on top of the one declared at signal-declaration time; Stellyra's combiner is fixed as part of the `CombiningEvent`'s declared type; there's no per-call override
+- call-time combiner override - rocket lets you override the combiner policy per call, on top of the one declared at signal-declaration time; Stellyra's combiner is fixed as part of the `BasicCombiningEvent`'s declared type; there's no per-call override
 - public-domain flexibility - Stellyra is BSD 3-Clause, which requires retaining the copyright notice; rocket's public-domain (dual-licensed permissive) model has no such requirement, though both are free for commercial use with no copyleft obligation
 
 ---
@@ -464,5 +464,5 @@ event( 42 );
 
 ### Features lost / changed
 
-- flexible per-call return-value collection - nod's `accumulate(init, op)` and `aggregate<Container>()` let you choose the combiner (and, for `aggregate()`, the container type) at the call site with no declared policy type on the signal at all. Stellyra's combiner is baked into the `CombiningEvent`'s declared type at compile time - more built-in combiners to choose from (10+ named ones vs nod's none), but less flexibility to vary the combiner call-to-call on the same event.
+- flexible per-call return-value collection - nod's `accumulate(init, op)` and `aggregate<Container>()` let you choose the combiner (and, for `aggregate()`, the container type) at the call site with no declared policy type on the signal at all. Stellyra's combiner is baked into the `BasicCombiningEvent`'s declared type at compile time - more built-in combiners to choose from (10+ named ones vs nod's none), but less flexibility to vary the combiner call-to-call on the same event.
 - license changes from MIT to BSD 3-Clause - both are permissive with no copyleft obligation, so this is a lateral move, not a functional change
