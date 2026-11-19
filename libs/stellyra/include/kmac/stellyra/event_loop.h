@@ -67,7 +67,6 @@
 #include <algorithm>
 #include <atomic>
 #include <mutex>
-#include <thread>
 #include <vector>
 
 namespace kmac {
@@ -75,8 +74,6 @@ namespace stellyra {
 
 class EventLoop
 {
-	friend class AutoDrainThread;
-
 public:
 	using Task = Callable< void() >;
 
@@ -121,9 +118,24 @@ private:
 	platform::Atomic< bool > _hasDrainThread { false };
 
 	/**
-	 * @brief Called at the end of post() to wake a waiting drain thread.
-	 * Null when no AutoDrainThread is attached.  Only AutoDrainThread may
-	 * set or clear this via the private accessors below.
+	 * @brief Called at the end of post() to wake a waiting drain thread (or
+	 * whatever else wants to know a task was posted).  Null if nothing is
+	 * attached.
+	 *
+	 * @warning Single slot, not a list: setPostNotify() silently replaces
+	 * whatever hook was previously installed.  At most one thing may own this
+	 * EventLoop's notification at a time - coordinate externally if more than
+	 * one subsystem might want to attach (e.g. don't pair AutoDrainThread with
+	 * your own setPostNotify() call on the same loop).
+	 *
+	 * @warning Not synchronized.  There is currently nothing in place to
+	 * guard check/call access from concurrent setPostNotify() or
+	 * clearPostNotify() calls.  This is safe only because of a usage
+	 * discipline, not enforcement: install the hook before any thread can
+	 * call post() on this loop, and clear it only after every thread that
+	 * might call post() has stopped (or been joined).  Calling
+	 * setPostNotify() or clearPostNotify() while another thread calls
+	 * post() could result in a data race on this field.
 	 */
 	Callable< void() > _postNotify;
 
@@ -186,6 +198,10 @@ public:
 	 * @brief Register a thread as the designated drain thread.
 	 *
 	 * May be called from any thread at any time.
+	 *
+	 * @note setPostNotify()/clearPostNotify() are not call-anytime like this -
+	 * see their own doc comments for the setup/teardown-only discipline they
+	 * require.
 	 */
 	void setDrainThread( platform::ThreadId id ) noexcept;
 
@@ -198,7 +214,7 @@ public:
 	void clearDrainThread() noexcept;
 
 	/**
-	 * @brief The gate BasicEvent::operator() (and BasicRecordableEvent's
+	 * @brief The gate GenericEvent::operator() (and GenericRecordableEvent's
 	 * equivalent) uses to decide whether a trigger dispatches synchronously
 	 * on the calling thread immediately or is deferred to this loop's queue
 	 * to run whenever it is next drained (i.e. whether sender-loop
@@ -284,16 +300,34 @@ public:
 	void setMigrateTestHook( void ( *hook )() );
 #endif
 
-private:
 	/**
 	 * @brief Installs the hook post() calls after enqueueing, to wake a
-	 * waiting drain thread.  Only AutoDrainThread calls this.
+	 * waiting drain thread or otherwise react to a task arriving.
+	 *
+	 * @warning At most one hook may be attached to a given loop at a time;
+	 * calling this again replaces the previous hook without warning - there
+	 * is no way to chain or stack multiple observers.  If more than one
+	 * area of the code needs to react to post(), the installed hook itself
+	 * must fan out to each of them.
+	 *
+	 * @warning Not synchronized against concurrent post() calls (see
+	 * _postNotify's doc comment).  The unguarded window is specifically
+	 * post()'s `if ( _postNotify ) { _postNotify(); }` tail, after the
+	 * _pendingMutex-protected section - nothing stops setPostNotify() or
+	 * clearPostNotify() from racing that check-and-call on another thread.
+	 * Install the hook once, at setup, before any other thread is given a
+	 * reference to this loop.
 	 */
 	void setPostNotify( Callable< void() > notify );
 
 	/**
 	 * @brief Removes the hook installed by setPostNotify(), restoring the
 	 * no-drain-thread-attached behaviour.
+	 *
+	 * @warning Not synchronized against concurrent post() calls (see
+	 * _postNotify's doc comment).  Call this only after every thread that
+	 * might call post() on this loop has stopped or been joined - typically
+	 * once, at teardown.
 	 */
 	void clearPostNotify();
 };

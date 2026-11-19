@@ -141,3 +141,77 @@ add_stellyra_test( test_deferred_teardown_order test_deferred_teardown_order.cpp
 add_stellyra_test( test_coverage_gaps          test_coverage_gaps.cpp )
 add_stellyra_test( test_edge_cases             test_edge_cases.cpp )
 add_stellyra_test( test_sense_plan_act         test_sense_plan_act.cpp )
+
+# ---------------------------------------------------------------------------
+# Qt integration test - only when the Qt module itself is being built.
+#
+# Does its own find_package( Qt ) and compiles the Qt module's source files
+# directly into this target rather than linking the KMac_StellyraQt target
+# the root CMakeLists.txt defines (same as every add_stellyra_test() target
+# above builds Stellyra's own headers directly via relative include paths
+# instead of linking KMac_Stellyra/KMac_StellyraExtras.  This file is also a
+# valid standalone CMake project for dealing with just tests/ directly in an
+# IDE without configuring the whole repo.
+#
+# Not routed through add_stellyra_test(): this target needs AUTOMOC (the
+# test fixtures are Q_OBJECT classes), and its own main() that constructs a
+# QCoreApplication before any QObject in the binary, so it links
+# GTest::gtest directly rather than GTest::gtest_main.
+# ---------------------------------------------------------------------------
+
+# when used as a stand-alone project needing Qt test, uncomment this
+# set( STELLYRA_BUILD_QT ON )
+if( STELLYRA_BUILD_QT )
+	find_package( Qt6 QUIET COMPONENTS Core )
+	if( Qt6_FOUND )
+		set( _stellyra_test_qt_package Qt6 )
+	else()
+		find_package( Qt5 REQUIRED COMPONENTS Core )
+		set( _stellyra_test_qt_package Qt5 )
+	endif()
+
+	# all Qt-dependent code must be listed explicitly for AUTOMOC to moc them
+	add_executable( test_qt_integration
+		qt_test_fixtures.h
+		test_qt_integration.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/../libs/stellyra_qt/include/kmac/stellyra/qt/qt_connect.h
+		${CMAKE_CURRENT_SOURCE_DIR}/../libs/stellyra_qt/include/kmac/stellyra/qt/event_loop_bridge.h
+		${CMAKE_CURRENT_SOURCE_DIR}/../libs/stellyra_qt/include/kmac/stellyra/qt/trackable_bridge.h
+		${CMAKE_CURRENT_SOURCE_DIR}/../libs/stellyra_qt/src/kmac/stellyra/qt/event_loop_bridge.cpp
+		${CMAKE_CURRENT_SOURCE_DIR}/../libs/stellyra_qt/src/kmac/stellyra/qt/trackable_bridge.cpp
+	)
+
+	target_include_directories( test_qt_integration PRIVATE
+		${CMAKE_CURRENT_SOURCE_DIR}/../libs/stellyra/include
+		${CMAKE_CURRENT_SOURCE_DIR}/../libs/stellyra_extras/include
+		${CMAKE_CURRENT_SOURCE_DIR}/../libs/stellyra_qt/include
+		${CMAKE_CURRENT_SOURCE_DIR}/..
+	)
+
+	target_link_libraries( test_qt_integration PRIVATE ${_stellyra_test_qt_package}::Core GTest::gtest )
+
+	if( UNIX )
+		target_link_libraries( test_qt_integration PRIVATE pthread )
+	endif()
+
+	target_compile_features( test_qt_integration PRIVATE cxx_std_17 )
+
+	if( CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang" )
+		target_compile_options( test_qt_integration PRIVATE -Wall -Wextra -Wpedantic )
+	elseif( MSVC )
+		target_compile_options( test_qt_integration PRIVATE /W4 /wd4127 )
+	endif()
+
+	set_target_properties( test_qt_integration PROPERTIES AUTOMOC ON )
+
+	if( WIN32 )
+		# test_qt_integration is the only target here that dynamically
+		# links Qt; none of the other other tests need this
+		gtest_discover_tests( test_qt_integration
+			DISCOVERY_MODE PRE_TEST
+			PROPERTIES ENVIRONMENT "PATH=$<TARGET_FILE_DIR:${_stellyra_test_qt_package}::Core>;$ENV{PATH}"
+		)
+	else()
+		gtest_discover_tests( test_qt_integration )
+	endif()
+endif()

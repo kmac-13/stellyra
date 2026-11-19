@@ -32,6 +32,10 @@ target_link_libraries( your_target PRIVATE Stellyra::Stellyra )
 
 # core + extras (BasicCombiningEvent, EventInspector, RecursiveRecordableEvent, etc.)
 target_link_libraries( your_target PRIVATE Stellyra::Extras )
+
+# core + Qt integration (EventLoopBridge) - opt-in, requires Qt5 or Qt6
+# cmake -DSTELLYRA_BUILD_QT=ON ...
+target_link_libraries( your_target PRIVATE Stellyra::Qt )
 ```
 
 ### Option 1: Inherit from Trackable (simplest)
@@ -178,6 +182,15 @@ public:
 - **Recordable Event** - records emissions with timestamps; replay at original, adjusted, or variable speed; export to CSV; performance statistics
 - **Properties** - `Property<T>` (read/write by anyone), `ReadOnlyProperty<Owner, T>` (read externally, write only by Owner), `ComputedProperty<Owner, T>` / `ComputedPropertyFn<Owner, T>` (derived from a member function or lambda), and `ConstProperty<T>`  (immutable) - all expose the same read surface (implicit conversion, get(), a changed event) so calling code doesn’t need to know which variant it’s holding
 
+### Qt Integration (`stellyra_qt.h`)
+- **EventLoopBridge** - a `QObject` that owns an `EventLoop` and drains it on its own Qt-affinity thread via a queued `QMetaObject::invokeMethod`, so Stellyra receivers can live on a Qt GUI/main thread without a dedicated background thread competing with Qt's own loop; drain-thread registration tracks `moveToThread()` automatically (construction + `QEvent::ThreadChange`), no manual call required for ordinary use to keep `EventLoop` associated with the same thread
+- **TrackableBridge** - a `QObject` composing a `Trackable`, used as the shared lifetime anchor for a receiver wired to both Qt signals and Stellyra events
+- **connectSignalToEvent** - forwards a Qt signal into a Stellyra event's `trigger()` (private events are not supported - see its doc comment for why, and the workaround)
+- **connectEventToTrackableBridge** - connects a Stellyra event to a method on a `TrackableBridge` (or a subclass adding its own signals/slots), via the tracked `Tracked<T>{ bridge, bridge.trackable() }` form
+- `stellyra_qt.h` wraps `stellyra.h` to guard against Qt's `emit` macro colliding with the events' own `emit()` method
+
+This is the one module in the repo that isn't header-only (`EventLoopBridge`/`TrackableBridge` need moc) and the only one with a Qt dependency - opt-in via `STELLYRA_BUILD_QT`, built against Qt5 or Qt6's Core module.
+
 ---
 
 ## Common Use Cases
@@ -239,7 +252,6 @@ Each library is benchmarked in separate binaries to avoid cross-library contamin
 | [`docs/USE_CASES.md`](docs/USE_CASES.md) | Architectural use cases and where Stellyra is not the right tool |
 | [`docs/USE_CASE_DIFFERENTIAL_MACHINE_CONTROL.md`](docs/USE_CASE_DIFFERENTIAL_MACHINE_CONTROL.md) | Worked use case: a differential/machine-control event pipeline |
 | [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) | Current limitations, toolchain findings, and verified correctness properties |
-| [`docs/TODO.md`](docs/TODO.md) | Open work and features under consideration |
 
 ---
 
