@@ -54,6 +54,54 @@ target_include_directories( KMac_StellyraExtras INTERFACE
 target_link_libraries( KMac_StellyraExtras INTERFACE KMac_Stellyra )
 
 # ============================================================================
+# KMac_StellyraQt module
+#
+# Not header-only like the two targets above: EventLoopBridge is a QObject
+# and needs moc, so this is a real compiled target.  Off by default so
+# configuring the repo never requires Qt to be installed.
+# ============================================================================
+
+option( STELLYRA_BUILD_QT "Build the Stellyra Qt integration module (requires Qt5 or Qt6)" OFF )
+
+set( _stellyra_install_targets KMac_Stellyra KMac_StellyraExtras )
+
+if( STELLYRA_BUILD_QT )
+	find_package( Qt6 QUIET COMPONENTS Core )
+	if( Qt6_FOUND )
+		set( _stellyra_qt_package Qt6 )
+	else()
+		find_package( Qt5 REQUIRED COMPONENTS Core )
+		set( _stellyra_qt_package Qt5 )
+	endif()
+
+	add_library( KMac_StellyraQt STATIC
+		libs/stellyra_qt/include/kmac/stellyra/qt/event_loop_bridge.h
+		libs/stellyra_qt/include/kmac/stellyra/qt/qt_connect.h
+		libs/stellyra_qt/include/kmac/stellyra/qt/trackable_bridge.h
+		libs/stellyra_qt/src/kmac/stellyra/qt/event_loop_bridge.cpp
+		libs/stellyra_qt/src/kmac/stellyra/qt/trackable_bridge.cpp
+	)
+	add_library( Stellyra::Qt ALIAS KMac_StellyraQt )
+
+	target_compile_features( KMac_StellyraQt PUBLIC cxx_std_17 )
+
+	target_include_directories( KMac_StellyraQt PUBLIC
+		$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/libs/stellyra_qt/include>
+		$<INSTALL_INTERFACE:include>
+	)
+
+	# Qt depends on core; PUBLIC so consumers linking KMac_StellyraQt also
+	# get Stellyra's headers and ${_stellyra_qt_package}::Core transitively
+	target_link_libraries( KMac_StellyraQt PUBLIC KMac_Stellyra ${_stellyra_qt_package}::Core )
+
+	set_target_properties( KMac_StellyraQt PROPERTIES
+		AUTOMOC ON
+	)
+
+	list( APPEND _stellyra_install_targets KMac_StellyraQt )
+endif()
+
+# ============================================================================
 # Optional compile-time feature flags
 #
 # Consumers can override these via target_compile_definitions or by passing
@@ -110,7 +158,7 @@ include( GNUInstallDirs )
 include( CMakePackageConfigHelpers )
 
 install(
-	TARGETS KMac_Stellyra KMac_StellyraExtras
+	TARGETS ${_stellyra_install_targets}
 	EXPORT  StellyraTargets
 )
 
@@ -123,6 +171,13 @@ install(
 	DIRECTORY libs/stellyra_extras/include/
 	DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
+
+if( STELLYRA_BUILD_QT )
+	install(
+		DIRECTORY libs/stellyra_qt/include/
+		DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+	)
+endif()
 
 install(
 	EXPORT      StellyraTargets
