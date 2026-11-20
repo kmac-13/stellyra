@@ -80,21 +80,40 @@
 /**
  * @brief Define to enable connection misconfiguration warnings.
  *
- * When defined (typically via compiler flag), Stellyra will log warnings when:
- * - a Direct connection is made between objects on different event loops
- * - a Direct connection's loop state is mismatched at the time of a migration
- * - a Direct connection's loop state is matched at the time of a migration
- *   (logged the same as the mismatched case above - this flag reports the
- *   current state on every migration touching a Direct/Deferred connection,
- *   not just the moment it changes; see connectImpl()/updateSenderLoop()/
- *   updateHandlerLoop() for the call sites)
- * - a Deferred connection is made when the receiver has no event loop
- * - a Deferred connection has no receiver loop at the time of a migration
- * - a Deferred connection has a receiver loop at the time of a migration
+ * When defined (typically via compiler flag), Stellyra will log a warning on
+ * every migration that touches a Direct or Deferred connection whose current
+ * state is misconfigured, AND on the migration that resolves a previously
+ * misconfigured connection back to a good state - a good-to-good migration
+ * (no prior misconfiguration, still none) stays silent.  Concretely:
+ * - a Direct connection is made (connect time) between objects on different
+ *   event loops - logged
+ * - a migration (sender- or receiver-side) makes a Direct connection's loops
+ *   mismatched, when they weren't before - logged
+ * - a migration touches a Direct connection that is ALREADY mismatched, and
+ *   it stays mismatched - logged again (this flag reports the current bad
+ *   state on every touch while it remains bad, not just the one transition
+ *   into it)
+ * - a migration resolves a Direct connection's mismatch (loops now match,
+ *   having not matched before this migration) - logged
+ * - a Deferred connection is made (connect time) when the receiver has no
+ *   event loop - logged
+ * - a migration leaves a Deferred connection with no receiver loop, when it
+ *   had one before - logged
+ * - a migration touches a Deferred connection that ALREADY has no receiver
+ *   loop, and it still has none - logged again, same reasoning as the
+ *   Direct case above
+ * - a migration gives a previously-unrouted Deferred connection a receiver
+ *   loop - logged (receiver-side migration only; a sender migration can
+ *   never change whether the receiver has a loop)
  * - an object/method connection is made with no Trackable to track it (see
  *   EventStorage::connectImpl() - the receiver doesn't inherit Trackable and
  *   no Tracked<T> pairing was used, so nothing will mark the slot inactive
- *   if the receiver is destroyed)
+ *   if the receiver is destroyed) - logged once, at connect; this condition
+ *   can't change after connect, so there is no corresponding migration-time
+ *   or resolution case
+ *
+ * See connectImpl()/updateSenderLoop()/updateHandlerLoop() for the call
+ * sites implementing all of the above.
  *
  * Defaults to disabled (0) if not defined externally.
  */

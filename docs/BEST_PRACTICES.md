@@ -390,8 +390,37 @@ delete receiver;  // can observe the receiver mid-destruction
 1. **Connection operations** (`disconnect()`, `isConnected()`, `block()`, `unblock()`) are individually thread-safe, even called concurrently on the same `Connection`
 2. **Assigning a new value into the same `Connection` variable** from multiple threads is *not* thread-safe - that's a genuine data race on the handle's own storage, not on anything it points to
 3. **Event operations** are fully thread-safe
-4. **Destroying a Trackable-derived receiver** is not automatically safe against a dispatch already in flight for it - `~Trackable()` only disconnects after the derived object’s own destructor body and members are already gone; use `EagerDisconnector` (`trackable.h`) or call `disconnectAll()` explicitly as the first line of your own destructor to close this (see `KNOWN_ISSUES.md`)
+4. **Destroying a Trackable-derived receiver** is not automatically safe against a dispatch already in flight for it - `~Trackable()` only disconnects after the derived object's own destructor body and members are already gone; use `EagerDisconnector` (`trackable.h`) or call `disconnectAll()` explicitly as the first line of your own destructor to close this (see `KNOWN_ISSUES.md`)
+
+   This only matters, though, if the receiver can actually be destroyed concurrently - on a *different* thread - from a dispatch already executing for it.  A dispatch to a Direct connection runs synchronously on whatever thread calls `trigger()`; a dispatch to a Deferred connection runs on the thread draining the *receiver's own* `EventLoop`.  So the risk is specifically: a Direct connection whose sender can trigger from a thread other than the one that destroys the receiver, or a Deferred connection whose receiver can be destroyed from a thread other than the one draining its own loop.  If neither applies - e.g. a receiver with only Deferred connections that's always destroyed on the thread draining its own loop, or purely single-threaded use - destruction and dispatch can never actually overlap, and `EagerDisconnector` has nothing to protect against.
+
 5. **When in doubt**, use `event.disconnect(receiver)` instead of Connection handles
+
+### Layered Receivers: Re-wrap at Each Leaf
+
+If you do need `EagerDisconnector` (per Rule 4 above), note that it only protects as deep as the type it wraps.  If a receiver hierarchy grows a new leaf that adds its own connections, that leaf needs its *own* `EagerDisconnector` wrap - an outer wrap from an earlier level is not inherited down the chain:
+
+```cpp
+class Rec1_impl : public stellyra::Trackable
+{
+public:
+	void onFirst( int ) { /* ... */ }
+};
+using Rec1 = stellyra::EagerDisconnector< Rec1_impl >;
+
+// Rec2 adds its own connections on top of Rec1's - it needs its own wrap,
+// not just inherited protection from Rec1's
+class Rec2_impl : public Rec1
+{
+public:
+	void onSecond( int ) { /* ... */ }
+};
+using Rec2 = stellyra::EagerDisconnector< Rec2_impl >;
+```
+
+Why?  `EagerDisconnector<T>`'s guarantee comes from being the *most-derived* type, so its destructor runs first - before `T`'s destructor body, before `T`'s own members, and before anything a further-derived class might add.  `Rec1`'s wrap only runs its `disconnectAll()` at the point `Rec1` itself is destroyed; by then, if `Rec2_impl` added its own connections (e.g. in `onSecond`), those are still live and unprotected unless `Rec2_impl` is *also* wrapped - wrapping only the base class does not "chain down" to a leaf that extends it.  Each new leaf that adds connections must re-wrap itself.
+
+The one redundant-but-harmless case is directly double-wrapping the same type (`EagerDisconnector<EagerDisconnector<T>>`) - `disconnectAll()` is idempotent (calling it a second time on an already-empty/disconnected receiver is a safe no-op), so the inner wrap's own `disconnectAll()` simply finds nothing left to do.
 
 ---
 

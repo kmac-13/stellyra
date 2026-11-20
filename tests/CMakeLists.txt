@@ -142,6 +142,16 @@ add_stellyra_test( test_coverage_gaps          test_coverage_gaps.cpp )
 add_stellyra_test( test_edge_cases             test_edge_cases.cpp )
 add_stellyra_test( test_sense_plan_act         test_sense_plan_act.cpp )
 
+# Connection misconfiguration/lifecycle logging - the only target built with
+# both logging flags forced on, so the actual log-line gating and content
+# (not just the "it compiles to nothing when off" smoke-tested elsewhere) is
+# exercised against the real headers.  Every other test target above builds
+# with both flags at their shipped-off default.
+add_stellyra_test( test_connection_logging     test_connection_logging.cpp )
+target_compile_definitions( test_connection_logging PRIVATE
+	STELLYRA_LOG_CONNECTION_ISSUES=1
+	STELLYRA_LOG_CONNECTION_LIFECYCLE=1 )
+
 # ---------------------------------------------------------------------------
 # Qt integration test - only when the Qt module itself is being built.
 #

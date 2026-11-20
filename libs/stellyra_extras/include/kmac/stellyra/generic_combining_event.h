@@ -187,7 +187,7 @@ struct CombiningEventImpl : EventImplBase
 	void unblockHandler( uint32_t index, uint32_t generation ) override;
 
 	// GenericCombiningEvent is Direct-only - EventLoop operations are no-ops
-	void updateSenderLoop( EventLoop* ) override {}
+	void updateSenderLoop( EventLoop*, EventLoop* ) override {}
 	void updateHandlerLoop( uint32_t, uint32_t, EventLoop* ) override {}
 	void invokeDeferred( uint32_t, uint32_t, const std::shared_ptr< void >& ) override {}
 

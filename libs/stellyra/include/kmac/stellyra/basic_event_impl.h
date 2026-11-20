@@ -222,7 +222,7 @@ struct BasicEventImpl : EventImplBase
 
 	void unblockHandler( uint32_t index, uint32_t generation ) override;
 
-	void updateSenderLoop( EventLoop* loop ) override;
+	void updateSenderLoop( EventLoop* loop, EventLoop* oldLoop ) override;
 
 	void updateHandlerLoop( uint32_t index, uint32_t generation, EventLoop* loop ) override;
 
@@ -521,7 +521,7 @@ void BasicEventImpl< MutexType, Args... >::unblockHandler( uint32_t index, uint3
 }
 
 template< typename MutexType, typename... Args >
-void BasicEventImpl< MutexType, Args... >::updateSenderLoop( EventLoop* loop )
+void BasicEventImpl< MutexType, Args... >::updateSenderLoop( EventLoop* loop, EventLoop* oldLoop )
 {
 	platform::LockGuard< MutexType > lock( mutex );
 	uint32_t count = 0;
@@ -552,6 +552,16 @@ void BasicEventImpl< MutexType, Args... >::updateSenderLoop( EventLoop* loop )
 					<< this << " slot=" << slot << " senderLoop=" << loop
 					<< " receiverLoop=" << entry.receiverLoop << "\n";
 			}
+			else if ( oldLoop != entry.receiverLoop )
+			{
+				// was mismatched (against the OLD sender loop), now matches - log the
+				// bad->good transition so that STELLYRA_LOG_CONNECTION_ISSUES shows
+				// a resolution the same way it shows the mismatch that preceded it
+				STELLYRA_CONNECTION_MISCONFIG_LOG()
+					<< "Direct connection mismatch resolved (sender migration): event="
+					<< this << " slot=" << slot << " senderLoop=" << loop
+					<< " receiverLoop=" << entry.receiverLoop << "\n";
+			}
 		}
 		else if ( declared == ConnectionType::Deferred && entry.receiverLoop == nullptr )
 		{
@@ -559,6 +569,10 @@ void BasicEventImpl< MutexType, Args... >::updateSenderLoop( EventLoop* loop )
 				<< "Deferred connection with no receiver loop (sender migration): event="
 				<< this << " slot=" << slot << "\n";
 		}
+		// no Deferred-resolution case here: whether a Deferred connection
+		// has a receiver loop depends only on entry.receiverLoop, which a
+		// sender migration never touches - that transition can only happen
+		// via updateHandlerLoop()'s receiver migration below
 
 		if ( entry.connTypes.resolvedConnType() != ResolvedConnectionType::Direct )
 		{
@@ -588,6 +602,7 @@ void BasicEventImpl< MutexType, Args... >::updateHandlerLoop( uint32_t index, ui
 	// actual current loop rather than whatever it was at connect time
 	if ( entry.connTypes.declaredConnType() == ConnectionType::Direct )
 	{
+		EventLoop* oldReceiverLoop = entry.receiverLoop;  // captured before the overwrite below, for the resolution check
 		entry.receiverLoop = loop;
 
 		EventLoop* senderLoop = owner ? owner->eventLoop() : nullptr;
@@ -598,10 +613,20 @@ void BasicEventImpl< MutexType, Args... >::updateHandlerLoop( uint32_t index, ui
 				<< this << " slot=" << index << " senderLoop=" << senderLoop
 				<< " receiverLoop=" << loop << "\n";
 		}
+		else if ( senderLoop != oldReceiverLoop )
+		{
+			// was mismatched (against the OLD receiver loop), now matches -
+			// see the matching comment in updateSenderLoop()
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Direct connection mismatch resolved (receiver migration): event="
+				<< this << " slot=" << index << " senderLoop=" << senderLoop
+				<< " receiverLoop=" << loop << "\n";
+		}
 		return;
 	}
 
 	const bool wasNonDirect = ( entry.connTypes.resolvedConnType() != ResolvedConnectionType::Direct );
+	EventLoop* oldReceiverLoop = entry.receiverLoop;  // captured before the overwrite below, for the Deferred resolution check
 
 	entry.receiverLoop = loop;
 
@@ -609,11 +634,25 @@ void BasicEventImpl< MutexType, Args... >::updateHandlerLoop( uint32_t index, ui
 	entry.connTypes.setResolvedConnType(
 		detail::resolveConnectionType( entry.connTypes.declaredConnType(), senderLoop, loop ) );
 
-	if ( entry.connTypes.declaredConnType() == ConnectionType::Deferred && loop == nullptr )
+	if ( entry.connTypes.declaredConnType() == ConnectionType::Deferred )
 	{
-		STELLYRA_CONNECTION_MISCONFIG_LOG()
-			<< "Deferred connection with no receiver loop (receiver migration): event="
-			<< this << " slot=" << index << "\n";
+		if ( loop == nullptr )
+		{
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Deferred connection with no receiver loop (receiver migration): event="
+				<< this << " slot=" << index << "\n";
+		}
+		else if ( oldReceiverLoop == nullptr )
+		{
+			// was unrouted (no receiver loop), now has one - the Direct
+			// case's resolution logging has a sender-migration counterpart
+			// too (updateSenderLoop()); this one doesn't, since whether a
+			// Deferred connection has a receiver loop never depends on the
+			// sender's loop at all
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Deferred connection now has a receiver loop (receiver migration): event="
+				<< this << " slot=" << index << "\n";
+		}
 	}
 
 	const bool isNonDirect = ( entry.connTypes.resolvedConnType() != ResolvedConnectionType::Direct );
