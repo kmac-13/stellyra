@@ -82,6 +82,7 @@
 #include "epoch_domain.h"
 
 #include <kmac/stellyra/callable.h>
+#include <kmac/stellyra/config.h>
 #include <kmac/stellyra/connection_type.h>
 #include <kmac/stellyra/event_detail.h>
 #include <kmac/stellyra/event_impl_base.h>
@@ -644,6 +645,7 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::preLockDisconnectAll
 {
 	SlotArray* slots = _slotsPtr.load( std::memory_order_relaxed );
 	const uint32_t used = _usedCount.load( std::memory_order_relaxed );
+	uint32_t removedCount = 0;
 	for ( uint32_t i = 0; i < used; ++i )
 	{
 		Entry* entry = slots[ i ].load( std::memory_order_relaxed );
@@ -655,10 +657,14 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::preLockDisconnectAll
 		slots[ i ].store( nullptr, std::memory_order_release );
 		++_nextGeneration[ i ];
 		_epoch.retire( entry );
+		++removedCount;
 	}
 
 	_priorityConnCount = 0;
 	publishOrder( nullptr );
+
+	STELLYRA_CONNECTION_LIFECYCLE_LOG()
+		<< "disconnectAll: event=" << this << " removed=" << removedCount << "\n";
 }
 
 template< typename MutexType, typename... Args >
@@ -726,6 +732,9 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::disconnectHandlers( 
 			continue;
 		}
 
+		STELLYRA_CONNECTION_LIFECYCLE_LOG()
+			<< "disconnect: event=" << this << " slot=" << entry.index << "\n";
+
 		if ( old->priority != 0 && _priorityConnCount > 0 )
 		{
 			--_priorityConnCount;
@@ -782,15 +791,39 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::updateSenderLoop( Ev
 	for ( uint32_t i = 0; i < used; ++i )
 	{
 		Entry* entry = slots[ i ].load( std::memory_order_relaxed );
-		if ( entry == nullptr || entry->declaredType != ConnectionType::Auto )
+		if ( entry == nullptr )
 		{
 			continue;
 		}
 
-		EventLoop* receiverLoop = entry->receiverLoop.load( std::memory_order_relaxed );
-		const ResolvedConnectionType resolved =
-			detail::resolveConnectionType( ConnectionType::Auto, loop, receiverLoop );
-		entry->resolvedType.store( resolved, std::memory_order_release );
+		if ( entry->declaredType == ConnectionType::Auto )
+		{
+			EventLoop* receiverLoop = entry->receiverLoop.load( std::memory_order_relaxed );
+			const ResolvedConnectionType resolved =
+				detail::resolveConnectionType( ConnectionType::Auto, loop, receiverLoop );
+			entry->resolvedType.store( resolved, std::memory_order_release );
+		}
+		else if ( entry->declaredType == ConnectionType::Direct )
+		{
+			// Direct always resolves as Direct regardless of topology (see
+			// resolveConnectionType()) - this is a raw topology check, not a
+			// resolved-type change
+			EventLoop* receiverLoop = entry->receiverLoop.load( std::memory_order_relaxed );
+			if ( loop != receiverLoop )
+			{
+				STELLYRA_CONNECTION_MISCONFIG_LOG()
+					<< "Direct connection with mismatched loops (sender migration): event="
+					<< this << " slot=" << i << " senderLoop=" << loop
+					<< " receiverLoop=" << receiverLoop << "\n";
+			}
+		}
+		else if ( entry->declaredType == ConnectionType::Deferred
+			&& entry->receiverLoop.load( std::memory_order_relaxed ) == nullptr )
+		{
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Deferred connection with no receiver loop (sender migration): event="
+				<< this << " slot=" << i << "\n";
+		}
 	}
 }
 
@@ -812,10 +845,25 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::updateHandlerLoop( u
 		return;
 	}
 
-	// Direct connections are not affected by receiver loop changes -
+	// Direct connections are not affected by receiver loop changes, so
+	// resolvedType is deliberately left untouched below for Direct - but
+	// entry->receiverLoop is still updated (it's the only place this field
+	// is ever written for a Direct-declared entry), so that a later sender
+	// migration's mismatch check in updateSenderLoop() reads the receiver's
+	// actual current loop rather than whatever it was at connect time -
 	// matches BasicEventImpl::updateHandlerLoop exactly
 	if ( entry->declaredType == ConnectionType::Direct )
 	{
+		entry->receiverLoop.store( loop, std::memory_order_relaxed );
+
+		EventLoop* senderLoop = owner ? owner->eventLoop() : nullptr;
+		if ( senderLoop != loop )
+		{
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Direct connection with mismatched loops (receiver migration): event="
+				<< this << " slot=" << index << " senderLoop=" << senderLoop
+				<< " receiverLoop=" << loop << "\n";
+		}
 		return;
 	}
 
@@ -825,6 +873,13 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::updateHandlerLoop( u
 	const ResolvedConnectionType resolved =
 		detail::resolveConnectionType( entry->declaredType, senderLoop, loop );
 	entry->resolvedType.store( resolved, std::memory_order_release );
+
+	if ( entry->declaredType == ConnectionType::Deferred && loop == nullptr )
+	{
+		STELLYRA_CONNECTION_MISCONFIG_LOG()
+			<< "Deferred connection with no receiver loop (receiver migration): event="
+			<< this << " slot=" << index << "\n";
+	}
 }
 
 template< typename MutexType, typename... Args >

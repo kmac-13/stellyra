@@ -88,6 +88,45 @@ enum class PredicateContext : uint8_t
 	Receiver = 1,  ///< (default) evaluated in trigger() for Direct, in EventLoop::drain() for Deferred connections
 };
 
+/**
+ * @brief Short, stable label for a declared ConnectionType, for log output
+ * (connection lifecycle/misconfiguration logging - see config.h).  Not
+ * localized and not meant for user-facing display beyond diagnostics.
+ */
+constexpr const char* toString( ConnectionType type )
+{
+	switch ( type )
+	{
+		case ConnectionType::Direct:
+			return "Direct";
+		case ConnectionType::Deferred:
+			return "Deferred";
+		case ConnectionType::Auto:
+			return "Auto";
+	}
+	// unknown type
+	return "?";
+}
+
+/**
+ * @brief Short, stable label for a ResolvedConnectionType, for log output -
+ * see toString(ConnectionType) above.
+ */
+constexpr const char* toString( ResolvedConnectionType type )
+{
+	switch ( type )
+	{
+		case ResolvedConnectionType::Direct:
+			return "Direct";
+		case ResolvedConnectionType::Deferred:
+			return "Deferred";
+		case ResolvedConnectionType::None:
+			return "None";
+	}
+	// unknown type
+	return "?";
+}
+
 } // namespace stellyra
 } // namespace kmac
 

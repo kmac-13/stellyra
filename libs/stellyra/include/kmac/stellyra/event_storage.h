@@ -65,6 +65,7 @@
 #include "stellyra_fwd.h"
 
 #include "callable.h"
+#include "config.h"
 #include "conn_params.h"
 #include "connection.h"
 #include "connection_type.h"
@@ -1229,11 +1230,13 @@ inline Connection EventStorage< ImplT, MutexType, Args... >::connectImpl(
 	uint32_t index;
 	uint16_t gen;
 	uint64_t tag;
+	EventLoop* senderLoop;
+	EventLoop* receiverLoop;
 	{
 		platform::LockGuard< MutexType > lock( _impl->mutex );
 
-		EventLoop* receiverLoop = tracker ? tracker->eventLoop() : nullptr;
-		EventLoop* senderLoop = _impl->owner ? _impl->owner->eventLoop() : nullptr;
+		senderLoop = _impl->owner ? _impl->owner->eventLoop() : nullptr;
+		receiverLoop = tracker ? tracker->eventLoop() : nullptr;
 		ResolvedConnectionType resolved = detail::resolveConnectionType( type, senderLoop, receiverLoop );
 
 		tag = tracker ? tracker->migrationTag() : 0;
@@ -1244,6 +1247,47 @@ inline Connection EventStorage< ImplT, MutexType, Args... >::connectImpl(
 			hasPredicate, std::move( predicate ),
 			predicateContext == PredicateContext::Receiver, gen );
 	}
+
+	// --- connection misconfiguration warnings (STELLYRA_LOG_CONNECTION_ISSUES) ---
+	//
+	// declared Direct always resolves to Direct regardless of loop topology
+	// (see resolveConnectionType()), so a Direct/mismatched-loops warning is
+	// about the raw topology, not the resolved type - check it directly here
+	if ( type == ConnectionType::Direct && senderLoop != receiverLoop )
+	{
+		STELLYRA_CONNECTION_MISCONFIG_LOG()
+			<< "Direct connection with mismatched loops: event=" << _impl.get()
+			<< " slot=" << index << " senderLoop=" << senderLoop
+			<< " receiverLoop=" << receiverLoop << "\n";
+	}
+	else if ( type == ConnectionType::Deferred && receiverLoop == nullptr )
+	{
+		STELLYRA_CONNECTION_MISCONFIG_LOG()
+			<< "Deferred connection with no receiver loop: event=" << _impl.get()
+			<< " slot=" << index << "\n";
+	}
+
+	// an object/method connection (hasOwner) with no tracker means T doesn't
+	// inherit Trackable and no Tracked<T> pairing was used - the connection
+	// is fully untracked, with no diagnostic until now; see connect()'s
+	// object/method overloads in this file
+	if ( hasOwner && ! tracker )
+	{
+		STELLYRA_CONNECTION_MISCONFIG_LOG()
+			<< "untracked object/method connection: event=" << _impl.get()
+			<< " slot=" << index
+			<< " - receiver does not inherit Trackable and no Tracked<T> pairing"
+			<< " was used; nothing will mark this slot inactive if the receiver"
+			<< " is destroyed\n";
+	}
+
+	// --- general connection lifecycle logging (STELLYRA_LOG_CONNECTION_LIFECYCLE) ---
+	STELLYRA_CONNECTION_LIFECYCLE_LOG()
+		<< "connect: event=" << _impl.get() << " slot=" << index
+		<< " hasOwner=" << ( hasOwner ? "true" : "false" )
+		<< " tracker=" << static_cast< void* >( tracker )
+		<< " declared=" << toString( type )
+		<< "\n";
 
 	platform::WeakPtr< EventImplBase > weak( _impl );
 	if ( tracker )
