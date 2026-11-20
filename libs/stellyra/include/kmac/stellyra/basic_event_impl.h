@@ -33,6 +33,7 @@
 #include "platform.h"
 
 #include "callable.h"
+#include "config.h"
 #include "connection_type.h"
 #include "event_impl_base.h"
 #include "event_loop.h"
@@ -524,17 +525,39 @@ void BasicEventImpl< MutexType, Args... >::updateSenderLoop( EventLoop* loop )
 {
 	platform::LockGuard< MutexType > lock( mutex );
 	uint32_t count = 0;
-	for ( auto& entry : handlers )
+	for ( uint32_t slot = 0; slot < static_cast< uint32_t >( handlers.size() ); ++slot )
 	{
+		auto& entry = handlers[ slot ];
 		if ( ! entry.flags.isActive() )
 		{
 			continue;
 		}
 
-		if ( entry.connTypes.declaredConnType() == ConnectionType::Auto )
+		const ConnectionType declared = entry.connTypes.declaredConnType();
+
+		if ( declared == ConnectionType::Auto )
 		{
 			entry.connTypes.setResolvedConnType( detail::resolveConnectionType(
 				ConnectionType::Auto, loop, entry.receiverLoop ) );
+		}
+		else if ( declared == ConnectionType::Direct )
+		{
+			// Direct always resolves as Direct regardless of topology (see
+			// resolveConnectionType()) - this is a raw topology check, not a
+			// resolved-type change, so it's independent of the branch above
+			if ( loop != entry.receiverLoop )
+			{
+				STELLYRA_CONNECTION_MISCONFIG_LOG()
+					<< "Direct connection with mismatched loops (sender migration): event="
+					<< this << " slot=" << slot << " senderLoop=" << loop
+					<< " receiverLoop=" << entry.receiverLoop << "\n";
+			}
+		}
+		else if ( declared == ConnectionType::Deferred && entry.receiverLoop == nullptr )
+		{
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Deferred connection with no receiver loop (sender migration): event="
+				<< this << " slot=" << slot << "\n";
 		}
 
 		if ( entry.connTypes.resolvedConnType() != ResolvedConnectionType::Direct )
@@ -557,9 +580,24 @@ void BasicEventImpl< MutexType, Args... >::updateHandlerLoop( uint32_t index, ui
 
 	auto& entry = handlers[ index ];
 
-	// direct connections are not affected by receiver loop changes
+	// direct connections are not affected by receiver loop changes, so
+	// resolvedType is deliberately left untouched below for Direct - but
+	// entry.receiverLoop is still updated (it's the only place this field is
+	// ever written for a Direct-declared entry), so that a later sender
+	// migration's mismatch check in updateSenderLoop() reads the receiver's
+	// actual current loop rather than whatever it was at connect time
 	if ( entry.connTypes.declaredConnType() == ConnectionType::Direct )
 	{
+		entry.receiverLoop = loop;
+
+		EventLoop* senderLoop = owner ? owner->eventLoop() : nullptr;
+		if ( senderLoop != loop )
+		{
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Direct connection with mismatched loops (receiver migration): event="
+				<< this << " slot=" << index << " senderLoop=" << senderLoop
+				<< " receiverLoop=" << loop << "\n";
+		}
 		return;
 	}
 
@@ -570,6 +608,13 @@ void BasicEventImpl< MutexType, Args... >::updateHandlerLoop( uint32_t index, ui
 	EventLoop* senderLoop = owner ? owner->eventLoop() : nullptr;
 	entry.connTypes.setResolvedConnType(
 		detail::resolveConnectionType( entry.connTypes.declaredConnType(), senderLoop, loop ) );
+
+	if ( entry.connTypes.declaredConnType() == ConnectionType::Deferred && loop == nullptr )
+	{
+		STELLYRA_CONNECTION_MISCONFIG_LOG()
+			<< "Deferred connection with no receiver loop (receiver migration): event="
+			<< this << " slot=" << index << "\n";
+	}
 
 	const bool isNonDirect = ( entry.connTypes.resolvedConnType() != ResolvedConnectionType::Direct );
 
@@ -918,6 +963,18 @@ void BasicEventImpl< MutexType, Args... >::dispatch( Args... args )
 template< typename MutexType, typename... Args >
 void BasicEventImpl< MutexType, Args... >::preLockDisconnectAll()
 {
+	// counted up front for the lifecycle summary line below - both branches
+	// wipe/invalidate every active slot unconditionally, so this is also the
+	// count of connections actually being removed by this call
+	uint32_t activeCount = 0;
+	for ( const auto& entry : handlers )
+	{
+		if ( entry.flags.isActive() )
+		{
+			++activeCount;
+		}
+	}
+
 	if ( triggerDepth == 0 )
 	{
 		// not reentrant - safe to fully wipe immediately
@@ -960,6 +1017,9 @@ void BasicEventImpl< MutexType, Args... >::preLockDisconnectAll()
 
 	nonDirectCount = 0;
 	predicateCount = 0;
+
+	STELLYRA_CONNECTION_LIFECYCLE_LOG()
+		<< "disconnectAll: event=" << this << " removed=" << activeCount << "\n";
 }
 
 template< typename MutexType, typename... Args >
@@ -995,6 +1055,9 @@ template< typename MutexType, typename... Args >
 void BasicEventImpl< MutexType, Args... >::disconnectSlotLocked( uint32_t slot )
 {
 	HandlerEntryType& entry = handlers[ slot ];
+
+	STELLYRA_CONNECTION_LIFECYCLE_LOG()
+		<< "disconnect: event=" << this << " slot=" << slot << "\n";
 
 	if ( entry.connTypes.resolvedConnType() != ResolvedConnectionType::Direct )
 	{

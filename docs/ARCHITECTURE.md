@@ -191,8 +191,9 @@ Qt integration support is the one non-header-only module in the repo:
 - `event_impl_base.h` - `EventImplBase`, the type-erased base every event's impl object inherits, giving `Connection`/`Trackable` a common interface independent of `Args...`, plus a globally unique per-instance `id`
 - `generic_private_event.h` / `private_event_types.h` - see above
 - `stellyra_fwd.h` - forward declarations only, for headers that need type names without full definitions
-- `config.h` - logging tags and the optional Nova logging integration (`STELLYRA_USE_NOVA`), plus the `STELLYRA_LOG_CONNECTION_ISSUES` compile flag for connection-misconfiguration warnings (off by default, zero
-  overhead when off)
+- `config.h` - logging tags and the optional Nova logging integration (`STELLYRA_USE_NOVA`), plus two independently-enabled compile flags for connection logging, each off by default with zero overhead when off:
+  - `STELLYRA_LOG_CONNECTION_ISSUES` for misconfiguration warnings (mismatched-loop Direct connections, no-loop Deferred connections, untracked object/method connections) and `STELLYRA_LOG_CONNECTION_LIFECYCLE` for a general trace of every connect/disconnect
+  - wired up at `EventStorage::connectImpl()` (connect time) and `updateSenderLoop()`/`updateHandlerLoop()`/`disconnectSlotLocked()`/`preLockDisconnectAll()` in both `BasicEventImpl` and `BasicConcurrentEventImpl` (migration and disconnect time)
 - `version.h` - compile-time version macros/constants
 - `stellyra_assert.h` - `stellyra_assert_always`, a hard assertion that is never compiled out by `NDEBUG` (unlike plain `assert`), for conditions indicating genuine API misuse with no well-defined way to continue
 - `event_signature.h` - resolves the function-style signature syntax shared by every `Args...`-based alias family: `BasicEvent`, `BasicConcurrentEvent`, `BasicRecordableEvent`, and `BasicPrivateEvent` (plus all mutex-specific variants), all of which are restricted to `void` returns (a `static_assert` is generated for any non-`void` return values); for legitimate non-`void` return value needs, use `BasicCombiningEvent` (`combining_event_types.h`), which has its own custom resolver
