@@ -279,7 +279,7 @@ inline void Trackable::setEventLoop( EventLoop* loop )
 	{
 		if ( auto impl = weak.lock() )
 		{
-			impl->updateSenderLoop( loop );
+			impl->updateSenderLoop( loop, oldLoop );
 		}
 	}
 

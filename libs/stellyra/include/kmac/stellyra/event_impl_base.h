@@ -105,8 +105,16 @@ public:
 	 * @brief Re-resolve all Auto connections using the new sender EventLoop.
 	 * Called by Trackable::setEventLoop() when the owning Trackable's loop
 	 * changes.
+	 *
+	 * @param loop the sender's new EventLoop
+	 * @param oldLoop the sender's EventLoop immediately before this change -
+	 *   needed (alongside the per-entry receiver loop already available
+	 *   locally) to tell a Direct-mismatch/Deferred-unrouted warning's
+	 *   bad->good resolution from a connection that was already fine, so
+	 *   STELLYRA_LOG_CONNECTION_ISSUES can log the resolution transition,
+	 *   not just the misconfigured one
 	 */
-	virtual void updateSenderLoop( EventLoop* loop ) = 0;
+	virtual void updateSenderLoop( EventLoop* loop, EventLoop* oldLoop ) = 0;
 
 	/**
 	 * @brief Update the receiver EventLoop for a handler entry and

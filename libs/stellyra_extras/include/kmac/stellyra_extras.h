@@ -30,7 +30,6 @@
  *
  * | Header               | Purpose                                             |
  * |----------------------|-----------------------------------------------------|
- * | scoped_connection.h  | ScopedConnection (RAII auto-disconnect)             |
  * | connection_guard.h   | ConnectionGuard (thread-safe Connection access)     |
  * | connection_group.h   | ConnectionGroup (multi-connection RAII)             |
  * | generic_combining_event.h | GenericCombiningEvent<Combiner, ReturnType,     |

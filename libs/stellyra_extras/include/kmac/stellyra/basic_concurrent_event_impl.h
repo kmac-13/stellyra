@@ -332,7 +332,7 @@ public:
 	 * atomic fields on each affected Entry - see Entry's docs above for why
 	 * that's sufficient and safe against a concurrent dispatch().
 	 */
-	void updateSenderLoop( EventLoop* loop ) override;
+	void updateSenderLoop( EventLoop* loop, EventLoop* oldLoop ) override;
 
 	/**
 	 * @brief Update one connection's receiver EventLoop and re-resolve it
@@ -781,7 +781,7 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::unblockHandler( uint
 }
 
 template< typename MutexType, typename... Args >
-inline void BasicConcurrentEventImpl< MutexType, Args... >::updateSenderLoop( EventLoop* loop )
+inline void BasicConcurrentEventImpl< MutexType, Args... >::updateSenderLoop( EventLoop* loop, EventLoop* oldLoop )
 {
 	platform::LockGuard< MutexType > lock( mutex );
 
@@ -816,6 +816,16 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::updateSenderLoop( Ev
 					<< this << " slot=" << i << " senderLoop=" << loop
 					<< " receiverLoop=" << receiverLoop << "\n";
 			}
+			else if ( oldLoop != receiverLoop )
+			{
+				// was mismatched (against the OLD sender loop), now matches -
+				// log the bad->good transition too; see the matching comment
+				// in BasicEventImpl::updateSenderLoop
+				STELLYRA_CONNECTION_MISCONFIG_LOG()
+					<< "Direct connection mismatch resolved (sender migration): event="
+					<< this << " slot=" << i << " senderLoop=" << loop
+					<< " receiverLoop=" << receiverLoop << "\n";
+			}
 		}
 		else if ( entry->declaredType == ConnectionType::Deferred
 			&& entry->receiverLoop.load( std::memory_order_relaxed ) == nullptr )
@@ -824,6 +834,8 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::updateSenderLoop( Ev
 				<< "Deferred connection with no receiver loop (sender migration): event="
 				<< this << " slot=" << i << "\n";
 		}
+		// no Deferred-resolution case here - see the matching comment in
+		// BasicEventImpl::updateSenderLoop
 	}
 }
 
@@ -854,6 +866,7 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::updateHandlerLoop( u
 	// matches BasicEventImpl::updateHandlerLoop exactly
 	if ( entry->declaredType == ConnectionType::Direct )
 	{
+		EventLoop* oldReceiverLoop = entry->receiverLoop.load( std::memory_order_relaxed );  // captured before the overwrite below, for the resolution check
 		entry->receiverLoop.store( loop, std::memory_order_relaxed );
 
 		EventLoop* senderLoop = owner ? owner->eventLoop() : nullptr;
@@ -864,9 +877,19 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::updateHandlerLoop( u
 				<< this << " slot=" << index << " senderLoop=" << senderLoop
 				<< " receiverLoop=" << loop << "\n";
 		}
+		else if ( senderLoop != oldReceiverLoop )
+		{
+			// was mismatched (against the OLD receiver loop), now matches -
+			// see the matching comment in BasicEventImpl::updateHandlerLoop
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Direct connection mismatch resolved (receiver migration): event="
+				<< this << " slot=" << index << " senderLoop=" << senderLoop
+				<< " receiverLoop=" << loop << "\n";
+		}
 		return;
 	}
 
+	EventLoop* oldReceiverLoop = entry->receiverLoop.load( std::memory_order_relaxed );  // captured before the overwrite below, for the Deferred resolution check
 	entry->receiverLoop.store( loop, std::memory_order_relaxed );
 
 	EventLoop* senderLoop = owner ? owner->eventLoop() : nullptr;
@@ -874,11 +897,22 @@ inline void BasicConcurrentEventImpl< MutexType, Args... >::updateHandlerLoop( u
 		detail::resolveConnectionType( entry->declaredType, senderLoop, loop );
 	entry->resolvedType.store( resolved, std::memory_order_release );
 
-	if ( entry->declaredType == ConnectionType::Deferred && loop == nullptr )
+	if ( entry->declaredType == ConnectionType::Deferred )
 	{
-		STELLYRA_CONNECTION_MISCONFIG_LOG()
-			<< "Deferred connection with no receiver loop (receiver migration): event="
-			<< this << " slot=" << index << "\n";
+		if ( loop == nullptr )
+		{
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Deferred connection with no receiver loop (receiver migration): event="
+				<< this << " slot=" << index << "\n";
+		}
+		else if ( oldReceiverLoop == nullptr )
+		{
+			// was unrouted, now has a receiver loop - see the matching
+			// comment in BasicEventImpl::updateHandlerLoop
+			STELLYRA_CONNECTION_MISCONFIG_LOG()
+				<< "Deferred connection now has a receiver loop (receiver migration): event="
+				<< this << " slot=" << index << "\n";
+		}
 	}
 }
 

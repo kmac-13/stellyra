@@ -72,7 +72,7 @@ handler.reset();         // connection auto-disconnects
 button.click( 30, 40 );  // safe - no crash, no call
 ```
 
-For a receiver that could be destroyed while dispatch is concurrently in flight, see `EagerDisconnector`.
+If the receiver's destructor could run concurrently with an in-flight dispatch (multi-threaded use), plain `Trackable` alone doesn't close that window - see `EagerDisconnector` (`trackable.h`) or `KNOWN_ISSUES.md`.
 
 ### Option 2: Embed Trackable as member (non-invasive)
 

@@ -190,6 +190,48 @@ TYPED_TEST( ConnectionLifecycle, BasicConnectDisconnectSanity )
 }
 
 // ---------------------------------------------------------------------------
+// disconnectAll() must be safe to call more than once in a row - both on
+// the event side and on the Trackable side.  This is now load-bearing: the
+// EagerDisconnector re-wrap-at-each-leaf pattern (see BEST_PRACTICES.md)
+// has every leaf in a layered receiver hierarchy wrap itself, so a single
+// destructor chain can run disconnectAll() once per wrap for the same
+// underlying object.  A second call must be a harmless no-op, not a crash
+// or a double-removal.
+// ---------------------------------------------------------------------------
+
+TYPED_TEST( ConnectionLifecycle, DisconnectAllOnEventCalledTwiceIsSafe )
+{
+	stellyra::BasicEvent< TypeParam, int > ev;
+	TestHandler r;
+	ev.connectLambda( r, [ &r ]( int ) { r.callCount++; } );
+	ev.connectLambda( r, [ &r ]( int ) { r.callCount++; } );
+
+	ev.disconnectAll();
+	EXPECT_NO_THROW( ev.disconnectAll() );  // second call - must be a no-op
+
+	stellyra::EventInspector inspector( ev );
+	EXPECT_EQ( inspector.getEventInfo().activeConnectionCount, 0u );
+	EXPECT_NO_THROW( ev( 0 ) );
+	EXPECT_EQ( r.callCount, 0 );
+}
+
+TEST( ConnectionLifecycle, DisconnectAllOnTrackableCalledTwiceIsSafe )
+{
+	TestButton button;
+	TestHandler handler;
+	button.clicked.connect( handler, &TestHandler::onClicked );
+	button.clicked.connect( handler, &TestHandler::onClicked );
+
+	handler.disconnectAll();
+	EXPECT_NO_THROW( handler.disconnectAll() );  // second call - must be a no-op
+
+	stellyra::EventInspector inspector( button.clicked );
+	EXPECT_EQ( inspector.getEventInfo().activeConnectionCount, 0u );
+	EXPECT_NO_THROW( button.click( 1, 1 ) );
+	EXPECT_EQ( handler.callCount.load(), 0 );
+}
+
+// ---------------------------------------------------------------------------
 // A Trackable with many connections to the same event is fully cleaned up
 // on destruction, regardless of how many slots it occupied.
 // ---------------------------------------------------------------------------
@@ -218,7 +260,7 @@ TYPED_TEST( ConnectionLifecycle, TrackableWithManyConnectionsCompaction )
 // ---------------------------------------------------------------------------
 // Reentrant connect() from within a firing handler is excluded from the
 // emission already in progress, and only takes effect on the next one.
-// Event/SingleThreadedEvent only (see file header).
+// RecursiveEvent/SingleThreadedEvent only (see file header).
 // ---------------------------------------------------------------------------
 
 template< typename MutexType >
@@ -254,7 +296,7 @@ TYPED_TEST( ConnectionLifecycleRestricted, ReentrantConnectExcludedFromCurrentEm
 
 // ---------------------------------------------------------------------------
 // Concurrent triggering from multiple real threads must not crash or
-// lose/duplicate calls. Event/SharedEvent only (see file header).
+// lose/duplicate calls.  RecursiveEvent/SharedEvent only (see file header).
 // ---------------------------------------------------------------------------
 
 template< typename MutexType >
