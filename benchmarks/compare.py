@@ -1238,10 +1238,14 @@ def main() -> None:
         "and N=5 of the same scenario.")
     lines.append("")
     lines.append(
-        "Collected on a single machine (Windows / MinGW-w64 GCC 13.1.0) - "
-        "several findings here are toolchain-specific (e.g. std::shared_mutex's "
-        "cost on this platform) and are not claims about behaviour on other "
-        "compilers or operating systems.")
+        "Several findings here are toolchain-specific (e.g. std::shared_mutex's "
+        "cost on the Windows / MinGW-w64 platform) and are not claims about "
+	   "behaviour on other compilers or operating systems.")
+    lines.append("")
+    lines.append(
+        "On Windows, having Memory Integrity (HVCI) enabled could add measurable "
+        "overhead to lock- and context-switch-heavy code; single-threaded "
+        "scenarios are unaffected.")
     lines.append("")
     lines.append(
         "Concurrent scenarios are split by what they actually measure, not by "
@@ -1285,9 +1289,10 @@ def main() -> None:
         if ctx:
             lines.append("## Environment")
             lines.append("")
+            lines.append(f"- **Host:** {ctx.get('host_name', 'unknown')}")
             lines.append(f"- **Compiler:** {ctx.get('library_build_type', '')}")
             lines.append(f"- **CPUs:** {ctx.get('num_cpus', '?')} × "
-                         f"{ctx.get('mhz_per_cpu', '?')} MHz")
+                f"{ctx.get('mhz_per_cpu', '?')} MHz")
             lines.append(f"- **Date:** {ctx.get('date', 'unknown')}")
             lines.append("")
         break

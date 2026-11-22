@@ -1,21 +1,21 @@
-#include <kmac/pulsar_extras.h>
+#include <kmac/stellyra_extras.h>
 
 #include <iostream>
 #include <memory>
 #include <thread>
 #include <chrono>
 
-namespace pulsar = kmac::pulsar;
+namespace stellyra = kmac::stellyra;
 
 // ============================================================================
 // Example 1: Basic Event/Handler
 // ============================================================================
 
-class Button : public pulsar::Object
+class Button : public stellyra::Trackable
 {
 public:
-	pulsar::Event< int, int > clicked { this };
-	pulsar::PEvent< Button, int, int > pClicked { this };
+	stellyra::RecursiveEvent< void ( int x, int y ) > clicked { this };
+	stellyra::RecursivePrivateEvent< Button, void ( int x, int y ) > pClicked { this };
 
 	void click( int x, int y )
 	{
@@ -29,7 +29,7 @@ public:
 	}
 };
 
-class ClickHandler : public pulsar::Object
+class ClickHandler : public stellyra::Trackable
 {
 public:
 	void onClicked( int x, int y )
@@ -51,18 +51,18 @@ void example1_basic()
 	std::cout << "Handler use_count: " << handler.use_count() << "\n";
 
 	std::cout << "Calling connect...\n";
-	auto conn = button->clicked.connect( handler, &ClickHandler::onClicked );
+	auto conn = button->clicked.connect( *handler, &ClickHandler::onClicked );
 
 	std::cout << "Connection created\n";
 	std::cout << "Connection isConnected: " << conn.isConnected() << "\n";
-	// use_count stays at 1 - Pulsar stores a weak_ptr to the receiver so
+	// use_count stays at 1 - Stellyra stores a weak_ptr to the receiver so
 	// connecting does not extend its lifetime; the connection is severed
 	// automatically when the receiver is destroyed.
 	std::cout
 		<< "Handler use_count after connect: " << handler.use_count()
 		<< " (connecting does not extend receiver lifetime)\n";
 
-	auto inspector = kmac::pulsar::EventInspector( button->clicked );
+	auto inspector = stellyra::EventInspector( button->clicked );
 	auto info = inspector.getEventInfo();
 	std::cout << "Event info:\n";
 	std::cout << "  Total connections: " << info.connectionCount << "\n";
@@ -72,13 +72,13 @@ void example1_basic()
 	inspector.dumpConnections( std::cout );
 
 	// demonstrate
-	auto pInspector = kmac::pulsar::EventInspector( button->pClicked );
+	auto pInspector = stellyra::EventInspector( button->pClicked );
 	auto pInfo = pInspector.getEventInfo();
 	std::cout << "PrivateEvent info (before connection):\n";
 	std::cout << "  Total connections: " << pInfo.connectionCount << "\n";
 	std::cout << "  Active connections: " << pInfo.activeConnectionCount << "\n";
 	std::cout << "  Direct connections: " << pInfo.directConnectionCount << "\n";
-	auto pConn = button->pClicked.connect( handler, &ClickHandler::onClicked );
+	auto pConn = button->pClicked.connect( *handler, &ClickHandler::onClicked );
 	pInfo = pInspector.getEventInfo();
 	std::cout << "PrivateEvent info (after connection):\n";
 	std::cout << "  Total connections: " << pInfo.connectionCount << "\n";
@@ -111,23 +111,23 @@ void example2_lambdas()
 {
 	std::cout << "\n=== Example 2: Lambdas ===\n";
 
-	auto button = std::make_shared< Button >();
-	auto receiver = std::make_shared< pulsar::Object >();
+	auto button = std::make_unique< Button >();
+	auto receiver = std::make_unique< stellyra::Trackable >();
 
 	// both lambdas are connected with receiver as the lifetime anchor -
 	// when receiver is reset() below, both connections are severed automatically
-	button->clicked.connect( receiver, []( int x, int y ) {
+	button->clicked.connectLambda( *receiver, []( int x, int y ) {
 		std::cout << "  Lambda 1: " << x << ", " << y << "\n";
 	} );
 
 	// count is captured by value so it outlives this scope safely
 	int count = 0;
-	button->clicked.connect( receiver, [ count ]( int, int ) mutable {
+	button->clicked.connectLambda( *receiver, [ count ]( int, int ) mutable {
 		std::cout << "  Lambda 2: Click #" << ++count << "\n";
 	} );
 
 	// debug: check connections were created
-	auto inspector = kmac::pulsar::EventInspector( button->clicked );
+	auto inspector = stellyra::EventInspector( button->clicked );
 	auto info = inspector.getEventInfo();
 	std::cout << "Connections: " << info.connectionCount << ", Active: " << info.activeConnectionCount << "\n";
 
@@ -153,15 +153,15 @@ void example3_singleshot()
 	std::cout << "\n=== Example 3: Single-Shot ===\n";
 
 	auto button = std::make_shared< Button >();
-	auto receiver = std::make_shared< pulsar::Object >();
+	auto receiver = std::make_shared< stellyra::Trackable >();
 
-	button->clicked.connect( receiver, []( int, int ) {
+	button->clicked.connectFree( *receiver, []( int, int ) {
 		std::cout << "  Regular: Called every time\n";
 	} );
 
-	button->clicked.connectOnce( receiver, []( int, int ) {
+	button->clicked.connectLambda( *receiver, []( int, int ) {
 		std::cout << "  Once: Called only once!\n";
-	} );
+	}, button->clicked.params().once() );
 
 	std::cout << "Click 1:\n";
 	button->click( 1, 1 );
@@ -185,14 +185,14 @@ void example4_conditional()
 	std::cout << "\n=== Example 4: Conditional ===\n";
 
 	auto button = std::make_shared< Button >();
-	auto receiver = std::make_shared< pulsar::Object >();
+	auto receiver = std::make_shared< stellyra::Trackable >();
 
-	button->clicked.connectIf(
-		receiver,
+	button->clicked.connectFree(
+		*receiver,
 		[]( int x, int y ) {
 			std::cout << "  First quadrant: " << x << ", " << y << "\n";
 		},
-		[]( int x, int y ) { return x > 0 && y > 0; }
+		[]( int x, int y ) { return x > 0 && y > 0; }  // implicit ConnParams
 	);
 
 	button->click( 10, 20 );   // processed
@@ -215,25 +215,25 @@ void example5_priority()
 	std::cout << "\n=== Example 5: Priority ===\n";
 
 	auto button = std::make_shared< Button >();
-	auto receiver = std::make_shared< pulsar::Object >();
+	auto receiver = std::make_shared< stellyra::Trackable >();
 
 	std::cout << "Connecting LOW priority...\n";
-	button->clicked.connectWithPriority(
-		receiver,
+	button->clicked.connectFree(
+		*receiver,
 		[]( int, int ) { std::cout << "  Priority LOW (-100)\n"; },
-		-100
+		button->clicked.params( -100 )
 	);
 
 	std::cout << "Connecting NORMAL priority...\n";
-	button->clicked.connectWithPriority(
-		receiver,
+	button->clicked.connectFree(
+		*receiver,
 		[]( int, int ) { std::cout << "  Priority NORMAL (0)\n"; },
-		0
+		0  // implicit ConnParams
 	);
 
 	std::cout << "Connecting HIGH priority...\n";
-	button->clicked.connectWithPriority(
-		receiver,
+	button->clicked.connectFree(
+		*receiver,
 		[]( int, int ) { std::cout << "  Priority HIGH (100)\n"; },
 		100
 	);
@@ -256,9 +256,9 @@ void example6_recording()
 	auto handler = std::make_shared< ClickHandler >();
 
 	// use RecordableEvent for recording capabilities
-	pulsar::RecordableEvent< int, int > recordableClicked{ button.get() };
+	stellyra::RecursiveRecordableEvent< int, int > recordableClicked{ button.get() };
 
-	recordableClicked.connect( handler, &ClickHandler::onClicked );
+	recordableClicked.connect( *handler, &ClickHandler::onClicked );
 
 	std::cout << "Recording clicks:\n";
 	recordableClicked.recorder().startRecording();
@@ -279,7 +279,7 @@ void example6_recording()
 // Example 7: Queued Connections
 // ============================================================================
 
-class Worker : public pulsar::Object
+class Worker : public stellyra::Trackable
 {
 public:
 	void processData( int x, int y )
@@ -290,40 +290,42 @@ public:
 	}
 };
 
+#include "kmac/stellyra/auto_drain_thread.h"
+
 void example7_queued()
 {
 	std::cout << "\n=== Example 7: Queued Connections ===\n";
 	std::cout << "Main thread: " << std::this_thread::get_id() << "\n";
 
-	pulsar::EventLoop loop = pulsar::EventLoop::makeAutoProcessed();
-	loop.start();
+	stellyra::EventLoop eventLoop;
+	stellyra::AutoDrainThread drainThread { eventLoop };  // thread automatically started
 
 	auto button = std::make_shared< Button >();
 	auto worker = std::make_shared< Worker >();
-	worker->setEventLoop( &loop );
+	worker->setEventLoop( &eventLoop );
 
 	// auto connection - will be queued
-	button->clicked.connect( worker, &Worker::processData, pulsar::ConnectionType::Auto );
+	button->clicked.connect( *worker, &Worker::processData, stellyra::ConnectionType::Auto );
 
 	button->click( 100, 200 );
 	button->click( 300, 400 );
 
 	std::this_thread::sleep_for( std::chrono::milliseconds( 50 ) );
 
-	loop.stop();
+	drainThread.stop();
 }
 
 // ============================================================================
 // Example 8: Combining Events
 // ============================================================================
 
-class Validator : public pulsar::Object
+class Validator : public stellyra::Trackable
 {
 public:
-	pulsar::CombiningEvent< bool, pulsar::Combiners::LogicalAnd<>, std::string > validate{ this };
+	stellyra::BasicCombiningEvent< stellyra::Combiners::LogicalAnd<>, bool, std::string > validate{ this };
 };
 
-class LengthChecker : public pulsar::Object
+class LengthChecker : public stellyra::Trackable
 {
 public:
 	bool checkLength( std::string input )
@@ -334,7 +336,7 @@ public:
 	}
 };
 
-class ContentChecker : public pulsar::Object
+class ContentChecker : public stellyra::Trackable
 {
 public:
 	bool checkContent( std::string input )
@@ -353,11 +355,11 @@ void example8_combining()
 	auto lengthChecker = std::make_shared< LengthChecker >();
 	auto contentChecker = std::make_shared< ContentChecker >();
 
-	validator->validate.connect( lengthChecker, &LengthChecker::checkLength );
-	validator->validate.connect( contentChecker, &ContentChecker::checkContent );
+	validator->validate.connect( *lengthChecker, &LengthChecker::checkLength );
+	validator->validate.connect( *contentChecker, &ContentChecker::checkContent );
 
 	std::cout << "Validating 'Hi':\n";
-	bool result1 = validator->validate.emit( "Hi" );
+	bool result1 = validator->validate.trigger( "Hi" );
 	std::cout << "Result: " << ( result1 ? "VALID" : "INVALID" ) << "\n";
 
 	std::cout << "\nValidating 'Hello':\n";
@@ -379,7 +381,7 @@ void example9_scoped()
 	std::cout << "Creating scoped connection:\n";
 	{
 		// create a scoped connection
-		auto scoped = button->clicked.connect( handler, &ClickHandler::onClicked ).scoped();
+		auto scoped = stellyra::ScopedConnection( button->clicked.connect( *handler, &ClickHandler::onClicked ) );
 
 		std::cout << "Inside scope:\n";
 		button->click( 1, 1 );
@@ -392,7 +394,7 @@ void example9_scoped()
 	button->click( 2, 2 );  // Should not trigger handler
 
 	// verify the connection is gone
-	auto inspector = kmac::pulsar::EventInspector( button->clicked );
+	auto inspector = stellyra::EventInspector( button->clicked );
 	auto info = inspector.getEventInfo();
 	std::cout << "Active connections: " << info.activeConnectionCount << "\n";
 }
@@ -401,10 +403,10 @@ void example9_scoped()
 // Example 10: Connection Groups (SIMPLER FIX)
 // ============================================================================
 
-class Widget : public pulsar::Object
+class Widget : public stellyra::Trackable
 {
 private:
-	pulsar::ConnectionGroup _connections;
+	stellyra::ConnectionGroup _connections;
 
 public:
 	Widget() = default;
@@ -412,15 +414,15 @@ public:
 	// setup connections after construction
 	void connectToButton( std::shared_ptr< Button > button )
 	{
-		_connections += button->clicked.connect(
-			shared_from_this(),
+		_connections += button->clicked.connectFree(
+			*this,
 			[]( int x, int y ) {
 				std::cout << "  Widget handler 1: " << x << ", " << y << "\n";
 			}
 		);
 
-		_connections += button->clicked.connect(
-			shared_from_this(),
+		_connections += button->clicked.connectFree(
+			*this,
 			[]( int x, int y ) {
 				std::cout << "  Widget handler 2: " << x << ", " << y << "\n";
 			}
@@ -458,8 +460,8 @@ void example10_groups()
 int main()
 {
 	std::cout << "=================================================\n";
-	std::cout << "Pulsar Event Library Examples\n";
-	std::cout << "Version: " << PULSAR_VERSION_STRING << "\n";
+	std::cout << "Stellyra Event Library Examples\n";
+	std::cout << "Version: " << STELLYRA_VERSION_STRING << "\n";
 	std::cout << "=================================================\n";
 
 	example1_basic();

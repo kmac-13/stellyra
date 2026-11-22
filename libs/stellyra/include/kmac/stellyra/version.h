@@ -13,8 +13,8 @@
 // NOLINT NOTE: integer macros required for preprocessor version
 // comparisons (#if STELLYRA_VERSION_MAJOR_INT >= 1) and stringification
 // NOLINTBEGIN(cppcoreguidelines-macro-usage)
-#define STELLYRA_VERSION_MAJOR_INT 0
-#define STELLYRA_VERSION_MINOR_INT 1
+#define STELLYRA_VERSION_MAJOR_INT 1
+#define STELLYRA_VERSION_MINOR_INT 0
 #define STELLYRA_VERSION_PATCH_INT 0
 
 // two-level stringify forces macro expansion before stringification
