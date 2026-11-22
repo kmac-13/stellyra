@@ -186,7 +186,7 @@ Transfer object to a different EventLoop, including pending events.  (Events alr
 **Auto-disconnect when going out of scope**
 ```cpp
 {
-	auto conn = event.connect( receiver, slot ).scoped();
+	auto conn = stellyra::ScopedConnection( event.connect( receiver, slot ) );
 	// auto-disconnects here
 }
 ```
